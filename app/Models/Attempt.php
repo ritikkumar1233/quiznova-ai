@@ -19,8 +19,10 @@ class Attempt extends Model
         'user_id',
         'answers',
         'score',
+        'violations',
         'started_at',
         'completed_at',
+        'disqualified_at',
         'embedding',
     ];
 
@@ -29,8 +31,10 @@ class Attempt extends Model
         return [
             'answers' => 'array',
             'score' => 'integer',
+            'violations' => 'integer',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
+            'disqualified_at' => 'datetime',
             'embedding' => 'array',
         ];
     }

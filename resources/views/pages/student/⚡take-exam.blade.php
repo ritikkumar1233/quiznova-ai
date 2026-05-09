@@ -39,6 +39,8 @@ new #[Title('Take Exam')] class extends Component {
 
     /** 'all' | 'flagged' */
     public string $filter = 'all';
+    public int $maxViolations = 3;
+    public bool $submittedForViolations = false;
 
     public function mount(): void
     {
@@ -64,6 +66,13 @@ new #[Title('Take Exam')] class extends Component {
             }
 
             $this->answers = $this->attempt->answers ?? [];
+
+            if ($this->attempt->violations >= $this->maxViolations && ! $this->attempt->isCompleted()) {
+                $this->submittedForViolations = true;
+                $this->submitExam();
+
+                return;
+            }
         }
 
         $this->normalizeAnswers();
@@ -270,7 +279,9 @@ new #[Title('Take Exam')] class extends Component {
             );
         }
 
-        if ($this->timedOut) {
+        if ($this->submittedForViolations) {
+            $this->dispatch('toast', variant: 'danger', heading: 'Disqualified', text: 'You have been disqualified due to multiple violations.');
+        } elseif ($this->timedOut) {
             $this->dispatch('toast', variant: 'warning', heading: "Time's up", text: 'Your exam has been automatically submitted.');
         }
 
@@ -302,7 +313,210 @@ new #[Title('Take Exam')] class extends Component {
     }
 }; ?>
 
-<div class="mx-auto max-w-3xl flex flex-col gap-6">
+<div
+    class="mx-auto max-w-3xl flex flex-col gap-6"
+    x-data="{
+        isPreview: @js($isPreview),
+        violations: @js((int) ($attempt?->violations ?? 0)),
+        maxViolations: @js($maxViolations),
+        warningMessage: '',
+        modalTitle: 'Fullscreen Required',
+        modalMessage: '',
+        showViolationModal: false,
+        isHandlingViolation: false,
+        isExitingPage: false,
+        isFinishingExam: false,
+        lastViolationAt: 0,
+        pendingF11Exit: false,
+        violationEndpoint: @js($attempt ? route('student.attempts.violations', $attempt) : ''),
+        dashboardUrl: @js(route('student.dashboard')),
+        csrfToken: @js(csrf_token()),
+        async init() {
+            if (this.isPreview || !document.fullscreenEnabled) {
+                return;
+            }
+
+            await this.enterFullscreen();
+
+            const leaveFullscreen = () => {
+                this.isExitingPage = true;
+                this.exitFullscreenSafely();
+            };
+
+            document.addEventListener('keydown', (event) => this.handleKeydown(event), true);
+            document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
+            document.addEventListener('livewire:navigating', leaveFullscreen);
+            window.addEventListener('pagehide', leaveFullscreen);
+            window.addEventListener('beforeunload', () => {
+                this.isExitingPage = true;
+                this.exitFullscreenSafely();
+            });
+        },
+        handleKeydown(event) {
+            if (this.isPreview || this.isExitingPage || this.isHandlingViolation) {
+                return;
+            }
+
+            if (event.key === 'F11' || event.keyCode === 122) {
+                event.preventDefault();
+                this.pendingF11Exit = true;
+                this.registerViolation('f11_key');
+            }
+        },
+        async enterFullscreen() {
+            if (document.fullscreenElement || this.isExitingPage) {
+                return;
+            }
+
+            try {
+                await document.documentElement.requestFullscreen();
+            } catch (error) {
+                this.warningMessage = 'Fullscreen could not be enabled automatically. Please allow fullscreen to continue the quiz.';
+            }
+        },
+        async exitFullscreenSafely() {
+            const fullscreenElement = document.fullscreenElement
+                || document.webkitFullscreenElement
+                || document.msFullscreenElement;
+
+            if (!fullscreenElement) {
+                console.log('Fullscreen exited');
+                return;
+            }
+
+            try {
+                if (typeof document.exitFullscreen === 'function') {
+                    await document.exitFullscreen();
+                } else if (typeof document.webkitExitFullscreen === 'function') {
+                    document.webkitExitFullscreen();
+                } else if (typeof document.msExitFullscreen === 'function') {
+                    document.msExitFullscreen();
+                }
+                console.log('Fullscreen exited');
+            } catch (error) {
+                // Ignore browser-level fullscreen errors; user may have already exited.
+                console.log('Fullscreen exited');
+            }
+        },
+        async submitQuizSafely(force = false) {
+            if (this.isFinishingExam && !force) {
+                return;
+            }
+
+            this.isFinishingExam = true;
+            this.isExitingPage = true;
+
+            // Exit fullscreen before submitting. A brief delay helps browsers settle
+            // fullscreen state to avoid race conditions with Livewire/form submit.
+            await this.exitFullscreenSafely();
+            await new Promise((resolve) => setTimeout(resolve, 260));
+
+            const quizForm = document.getElementById('quizForm');
+            let livewireSubmitted = false;
+
+            try {
+                console.log('Submitting exam...');
+                await Promise.race([
+                    $wire.submitExam(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Livewire submit timeout')), 3000)),
+                ]);
+                livewireSubmitted = true;
+            } catch (error) {
+                // Fallback is mandatory to guarantee submission even if Livewire fails/times out.
+            }
+
+            if (!livewireSubmitted && quizForm) {
+                console.log('Fallback submit triggered');
+                quizForm.submit();
+            }
+        },
+        async handleManualExit() {
+            if (this.isFinishingExam) {
+                return;
+            }
+
+            this.isExitingPage = true;
+            await this.exitFullscreenSafely();
+            await new Promise((resolve) => setTimeout(resolve, 220));
+            window.location.href = this.dashboardUrl;
+        },
+        async handleFullscreenChange() {
+            if (this.isPreview || this.isExitingPage || document.fullscreenElement || this.isHandlingViolation) {
+                return;
+            }
+
+            const reason = this.pendingF11Exit ? 'f11_exit' : 'fullscreen_exit';
+            this.pendingF11Exit = false;
+
+            await this.registerViolation(reason);
+        },
+        async registerViolation(reason) {
+            const now = Date.now();
+
+            if (this.isHandlingViolation || now - this.lastViolationAt < 1200) {
+                return;
+            }
+
+            this.lastViolationAt = now;
+            this.isHandlingViolation = true;
+            this.warningMessage = 'You must stay in fullscreen mode during the exam.';
+            this.modalTitle = 'Fullscreen Required';
+            this.modalMessage = 'You must stay in fullscreen mode during the exam.';
+            this.showViolationModal = true;
+
+            try {
+                const response = await fetch(this.violationEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': this.csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        event: 'fullscreen_exit',
+                        reason: reason,
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Unable to record violation on the server.');
+                }
+
+                const data = await response.json();
+                this.violations = Number(data.violations ?? this.violations + 1);
+
+                if (Boolean(data.must_submit)) {
+                    console.log('Violation limit reached');
+                    this.isFinishingExam = true;
+                    this.isExitingPage = true;
+                    this.modalTitle = 'Disqualified';
+                    this.modalMessage = 'You have been disqualified due to multiple violations';
+                    this.warningMessage = this.modalMessage;
+                    this.showViolationModal = false;
+                    $wire.set('submittedForViolations', true);
+                    this.isHandlingViolation = false;
+                    await this.submitQuizSafely(true);
+
+                    return;
+                }
+            } catch (error) {
+                this.violations += 1;
+                this.modalTitle = 'Fullscreen Required';
+                this.modalMessage = 'You must stay in fullscreen mode during the exam.';
+                this.warningMessage = 'Violation could not be synced right now, but fullscreen is still required.';
+            }
+        },
+        async acknowledgeViolation() {
+            if (!this.showViolationModal || this.isExitingPage) {
+                return;
+            }
+
+            this.showViolationModal = false;
+            await this.enterFullscreen();
+            this.isHandlingViolation = false;
+        }
+    }"
+>
     @if ($isPreview)
         <flux:callout variant="warning" icon="eye">
             <flux:callout.heading>Preview Mode</flux:callout.heading>
@@ -320,7 +534,51 @@ new #[Title('Take Exam')] class extends Component {
         </flux:callout>
     @endif
 
-    <div class="flex items-center justify-between">
+    @if (! $isPreview)
+        <div
+            x-cloak
+            x-show="warningMessage"
+            class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+            role="alert"
+        >
+            <div class="flex items-center justify-between gap-3">
+                <span x-text="warningMessage"></span>
+                <span class="font-semibold">
+                    Violations: <span x-text="violations"></span>/<span x-text="maxViolations"></span>
+                </span>
+            </div>
+        </div>
+
+        <div
+            x-cloak
+            x-show="showViolationModal"
+            x-transition.opacity
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fullscreen-warning-title"
+        >
+            <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+                <h2 id="fullscreen-warning-title" class="text-lg font-semibold text-charcoal-900" x-text="modalTitle"></h2>
+                <p class="mt-3 text-sm text-charcoal-700" x-text="modalMessage"></p>
+                <p class="mt-2 text-sm font-medium text-red-700">
+                    Warnings: <span x-text="violations"></span>/<span x-text="maxViolations"></span>
+                </p>
+                <div class="mt-6 flex justify-end">
+                    <button
+                        type="button"
+                        class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        x-bind:disabled="isExitingPage"
+                        x-on:click="acknowledgeViolation()"
+                    >
+                        OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+        <div class="flex items-center justify-between" x-bind:class="{ 'pointer-events-none opacity-70 select-none': showViolationModal || isFinishingExam }">
         <div>
             <flux:heading size="xl">{{ $exam->title }}</flux:heading>
             <div class="flex items-center gap-3 mt-1">
@@ -330,7 +588,7 @@ new #[Title('Take Exam')] class extends Component {
                 @endif
             </div>
         </div>
-        <flux:button variant="ghost" :href="route('student.dashboard')" wire:navigate>Exit</flux:button>
+        <flux:button variant="ghost" type="button" x-on:click.prevent="handleManualExit()">Exit Test</flux:button>
     </div>
 
     {{-- ── Countdown Timer ── --}}
@@ -440,7 +698,13 @@ new #[Title('Take Exam')] class extends Component {
         </div>
     @endif
 
-    <form wire:submit="submitExam" class="space-y-4">
+    <form
+        id="quizForm"
+        wire:submit="submitExam"
+        x-on:submit="if (!isFinishingExam) { isExitingPage = true; isFinishingExam = true; }"
+        x-bind:class="{ 'pointer-events-none opacity-70 select-none': showViolationModal || isFinishingExam }"
+        class="space-y-4"
+    >
         @foreach ($this->filteredQuestions as $index => $question)
             @php $isFlagged = $answers[$question->id]['flagged'] ?? false; @endphp
             <div

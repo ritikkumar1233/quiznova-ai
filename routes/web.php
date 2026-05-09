@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PdfDownloadController;
+use App\Http\Controllers\AttemptViolationController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -36,6 +37,7 @@ Route::middleware(['auth', 'verified', 'role:student'])
         Route::livewire('/attempts/{attempt}/results', 'pages::student.exam-results')->name('attempts.results');
         Route::livewire('/attempts', 'pages::student.attempts')->name('attempts');
         Route::livewire('/exams/{exam}/leaderboard', 'pages::student.leaderboard')->name('exams.leaderboard');
+        Route::post('/attempts/{attempt}/violations', AttemptViolationController::class)->name('attempts.violations');
     });
 
 // PDF export download (signed URL — auth not required, signature acts as the token)
