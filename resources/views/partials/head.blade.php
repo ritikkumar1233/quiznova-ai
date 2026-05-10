@@ -15,3 +15,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+@php
+    // Fallback: include built CSS directly if Vite manifest isn't being applied
+    $builtCss = public_path('build/assets/app-CkY8i0qB.css');
+@endphp
+@if (file_exists($builtCss))
+    <link rel="stylesheet" href="{{ asset('build/assets/app-CkY8i0qB.css') }}">
+@endif

@@ -186,6 +186,14 @@ new #[Title('Manage Questions')] class extends Component {
      */
     public function generateWithAi(): void
     {
+        $providers = ResolvedProviders::list();
+
+        if (empty($providers)) {
+            $this->aiError = 'No AI providers are configured. Add a provider API key or set OLLAMA_BASE_URL to use Ollama.';
+
+            return;
+        }
+
         if (Cache::has('ai_budget_exceeded:'.auth()->id())) {
             $this->aiError = 'Daily AI budget exceeded. Please try again tomorrow.';
 
@@ -218,9 +226,14 @@ new #[Title('Manage Questions')] class extends Component {
 
             $agent->queue(
                 "Generate {$this->aiCount} questions about {$this->aiTopic}.",
-                provider: ResolvedProviders::list(),
+                provider: $providers,
             )->then(function ($response) use ($examId) {
                 $data = json_decode($response->text, true);
+
+                if (! is_array($data) || ! isset($data['questions'])) {
+                    throw new \RuntimeException('AI response invalid.');
+                }
+
                 ProcessGeneratedQuestionsJob::dispatch(
                     $examId,
                     $data['questions'] ?? [],
@@ -230,7 +243,7 @@ new #[Title('Manage Questions')] class extends Component {
             $this->dispatch('toast', heading: 'Queued', text: "Generating {$this->aiCount} questions in the background. Refresh in a moment.");
         } catch (\Throwable $e) {
             logger()->error('AI generation failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            $this->aiError = 'AI generation failed. Please try again or add questions manually.';
+            $this->aiError = 'AI generation failed. Check your AI provider keys or Ollama server, then try again.';
         } finally {
             $this->aiGenerating = false;
         }
@@ -243,6 +256,14 @@ new #[Title('Manage Questions')] class extends Component {
      */
     public function streamGenerateWithAi(): void
     {
+        $providers = ResolvedProviders::list();
+
+        if (empty($providers)) {
+            $this->aiError = 'No AI providers are configured. Add a provider API key or set OLLAMA_BASE_URL to use Ollama.';
+
+            return;
+        }
+
         if (Cache::has('ai_budget_exceeded:'.auth()->id())) {
             $this->aiError = 'Daily AI budget exceeded. Please try again tomorrow.';
 
@@ -273,10 +294,15 @@ new #[Title('Manage Questions')] class extends Component {
 
             $response = $agent->prompt(
                 "Generate {$this->aiCount} questions about {$this->aiTopic}.",
-                provider: ResolvedProviders::list(),
+                provider: $providers,
             );
 
             $data = json_decode($response->text, true);
+
+            if (! is_array($data) || ! isset($data['questions'])) {
+                throw new \RuntimeException('AI response invalid.');
+            }
+
             $this->pendingAiQuestions = $data['questions'] ?? [];
 
             if (count($this->pendingAiQuestions) > 0) {
@@ -284,7 +310,7 @@ new #[Title('Manage Questions')] class extends Component {
             }
         } catch (\Throwable $e) {
             logger()->error('AI generation failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            $this->aiError = 'AI generation failed. Please try again or add questions manually.';
+            $this->aiError = 'AI generation failed. Check your AI provider keys or Ollama server, then try again.';
         } finally {
             $this->aiGenerating = false;
         }
