@@ -6,6 +6,29 @@ use App\Models\Exam;
 use App\Models\User;
 use Livewire\Livewire;
 
+it('shows a clear error when no AI providers are configured', function () {
+    $teacher = User::factory()->teacher()->create();
+    $exam = Exam::factory()->published()->for($teacher)->create();
+
+    config()->set('ai.providers.anthropic.key', null);
+    config()->set('ai.providers.gemini.key', null);
+    config()->set('ai.providers.openai.key', null);
+    config()->set('ai.providers.azure.key', null);
+    config()->set('ai.providers.azure.url', null);
+    config()->set('ai.providers.ollama.key', null);
+    config()->set('ai.providers.ollama.url', 'http://localhost:11434');
+
+    Livewire::actingAs($teacher)
+        ->test('pages::teacher.exams.questions', ['exam' => $exam])
+        ->set('aiTopic', 'Math')
+        ->set('aiType', QuestionType::ShortAnswer->value)
+        ->set('aiCount', 2)
+        ->set('aiDifficulty', 1)
+        ->call('streamGenerateWithAi')
+        ->assertSet('aiError', 'No AI providers are configured. Add a provider API key or set OLLAMA_BASE_URL to use Ollama.')
+        ->assertCount('pendingAiQuestions', 0);
+});
+
 // ── discardAiQuestion ────────────────────────────────────────────────────────
 
 it('discards a single pending AI question by index', function () {

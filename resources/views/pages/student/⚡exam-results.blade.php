@@ -121,7 +121,8 @@ new #[Title('Exam Results')] class extends Component {
     }
 }; ?>
 
-<div class="mx-auto max-w-3xl flex flex-col gap-6">
+<div>
+    <div class="mx-auto max-w-3xl flex flex-col gap-6">
     <div class="flex items-center gap-4">
         <flux:button variant="ghost" icon="arrow-left" :href="route('student.dashboard')" wire:navigate />
         <flux:heading size="xl">Results: {{ $attempt->exam->title }}</flux:heading>
@@ -242,6 +243,17 @@ new #[Title('Exam Results')] class extends Component {
                         </div>
                     @endif
                 @endif
+
+                {{-- Explain button: open floating chat with context --}}
+                <div class="pt-2">
+                    <flux:button
+                        variant="outline"
+                        size="sm"
+                        onclick="window.dispatchEvent(new CustomEvent('open-chat')); Livewire.dispatch('openChat', { questionId: {{ $question->id }}, question: @js($question->question), answer: @js($rawAnswer ?? ''), correctAnswer: @js($question->correct_answer) })"
+                    >
+                        Explain
+                    </flux:button>
+                </div>
             </div>
         @endforeach
     </div>
@@ -268,4 +280,7 @@ new #[Title('Exam Results')] class extends Component {
             Back to Dashboard
         </flux:button>
     </div>
+    </div>
+
+    <livewire:student-chat />
 </div>
