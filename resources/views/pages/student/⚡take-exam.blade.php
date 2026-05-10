@@ -345,6 +345,7 @@ new #[Title('Take Exam')] class extends Component {
 
             document.addEventListener('keydown', (event) => this.handleKeydown(event), true);
             document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
+            document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
             document.addEventListener('livewire:navigating', leaveFullscreen);
             window.addEventListener('pagehide', leaveFullscreen);
             window.addEventListener('beforeunload', () => {
@@ -450,8 +451,22 @@ new #[Title('Take Exam')] class extends Component {
 
             await this.registerViolation(reason);
         },
+        async handleVisibilityChange() {
+            if (this.isPreview || this.isExitingPage || this.isHandlingViolation) {
+                return;
+            }
+
+            if (document.hidden) {
+                await this.registerViolation('tab_switch');
+            }
+        },
         async registerViolation(reason) {
             const now = Date.now();
+            const isTabSwitch = reason === 'tab_switch';
+            const violationEvent = isTabSwitch ? 'tab_switch' : 'fullscreen_exit';
+            const baseWarning = isTabSwitch
+                ? 'Tab switch detected. Stay on the exam tab during the test.'
+                : 'You must stay in fullscreen mode during the exam.';
 
             if (this.isHandlingViolation || now - this.lastViolationAt < 1200) {
                 return;
@@ -459,9 +474,9 @@ new #[Title('Take Exam')] class extends Component {
 
             this.lastViolationAt = now;
             this.isHandlingViolation = true;
-            this.warningMessage = 'You must stay in fullscreen mode during the exam.';
+            this.warningMessage = baseWarning;
             this.modalTitle = 'Fullscreen Required';
-            this.modalMessage = 'You must stay in fullscreen mode during the exam.';
+            this.modalMessage = baseWarning;
             this.showViolationModal = true;
 
             try {
@@ -473,7 +488,7 @@ new #[Title('Take Exam')] class extends Component {
                         'Accept': 'application/json',
                     },
                     body: JSON.stringify({
-                        event: 'fullscreen_exit',
+                        event: violationEvent,
                         reason: reason,
                     }),
                 });
@@ -502,8 +517,26 @@ new #[Title('Take Exam')] class extends Component {
             } catch (error) {
                 this.violations += 1;
                 this.modalTitle = 'Fullscreen Required';
-                this.modalMessage = 'You must stay in fullscreen mode during the exam.';
-                this.warningMessage = 'Violation could not be synced right now, but fullscreen is still required.';
+                this.modalMessage = baseWarning;
+                this.warningMessage = isTabSwitch
+                    ? 'Tab switch violation could not be synced right now, but tab switching is still not allowed.'
+                    : 'Violation could not be synced right now, but fullscreen is still required.';
+
+                // If syncing failed but local violations reached the limit, enforce submission locally
+                if (this.violations >= this.maxViolations) {
+                    console.log('Local violation limit reached');
+                    this.isFinishingExam = true;
+                    this.isExitingPage = true;
+                    this.modalTitle = 'Disqualified';
+                    this.modalMessage = 'You have been disqualified due to multiple violations';
+                    this.warningMessage = this.modalMessage;
+                    this.showViolationModal = false;
+                    $wire.set('submittedForViolations', true);
+                    this.isHandlingViolation = false;
+                    await this.submitQuizSafely(true);
+
+                    return;
+                }
             }
         },
         async acknowledgeViolation() {

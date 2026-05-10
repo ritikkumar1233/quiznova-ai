@@ -26,6 +26,30 @@ it('records a fullscreen violation for the current student attempt', function ()
     expect($attempt->fresh()->violations)->toBe(1);
 });
 
+it('records a tab switch violation for the current student attempt', function () {
+    $student = User::factory()->student()->create();
+    $teacher = User::factory()->teacher()->create();
+    $exam = Exam::factory()->published()->for($teacher)->create();
+    $attempt = Attempt::factory()->create([
+        'exam_id' => $exam->id,
+        'user_id' => $student->id,
+        'violations' => 0,
+    ]);
+
+    $response = $this->actingAs($student)->postJson(
+        route('student.attempts.violations', $attempt),
+        ['event' => 'tab_switch'],
+    );
+
+    $response->assertOk()
+        ->assertJsonPath('event', 'tab_switch')
+        ->assertJsonPath('violations', 1)
+        ->assertJsonPath('must_submit', false)
+        ->assertJsonPath('message', 'Tab switch violation recorded.');
+
+    expect($attempt->fresh()->violations)->toBe(1);
+});
+
 it('marks attempt for auto-submit when violations reach the limit', function () {
     $student = User::factory()->student()->create();
     $teacher = User::factory()->teacher()->create();
