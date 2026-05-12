@@ -12,11 +12,12 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('Take Exam')] class extends Component {
+new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
     public Exam $exam;
     public ?Attempt $attempt = null;
 
@@ -329,9 +330,20 @@ new #[Title('Take Exam')] class extends Component {
         lastViolationAt: 0,
         pendingF11Exit: false,
         violationEndpoint: @js($attempt ? route('student.attempts.violations', $attempt) : ''),
-        dashboardUrl: @js(route('student.dashboard')),
         csrfToken: @js(csrf_token()),
         async init() {
+            if (!this.isPreview) {
+                // Keep the student on this route when using the browser Back button (no `beforeunload` dialog).
+                history.pushState({ examMode: true }, '', window.location.href);
+                window.addEventListener('popstate', () => {
+                    if (this.isExitingPage || this.isFinishingExam) {
+                        return;
+                    }
+                    history.pushState({ examMode: true }, '', window.location.href);
+                    this.warningMessage = 'Navigation away from the exam is disabled. Use Submit Exam when you are finished.';
+                });
+            }
+
             if (this.isPreview || !document.fullscreenEnabled) {
                 return;
             }
@@ -430,16 +442,6 @@ new #[Title('Take Exam')] class extends Component {
                 console.log('Fallback submit triggered');
                 quizForm.submit();
             }
-        },
-        async handleManualExit() {
-            if (this.isFinishingExam) {
-                return;
-            }
-
-            this.isExitingPage = true;
-            await this.exitFullscreenSafely();
-            await new Promise((resolve) => setTimeout(resolve, 220));
-            window.location.href = this.dashboardUrl;
         },
         async handleFullscreenChange() {
             if (this.isPreview || this.isExitingPage || document.fullscreenElement || this.isHandlingViolation) {
@@ -547,7 +549,35 @@ new #[Title('Take Exam')] class extends Component {
             this.showViolationModal = false;
             await this.enterFullscreen();
             this.isHandlingViolation = false;
-        }
+        },
+
+        /**
+         * HTML implicitly submits a form when Enter is pressed on many focused controls
+         * (e.g. a selected radio). Students then submit by accident. We block that here
+         * while keeping: Tab/arrow navigation, Enter in textareas, and Enter on the
+         * real Submit control (keyboard accessibility).
+         */
+        suppressExamEnterSubmit(event) {
+            const target = event.target;
+            if (target instanceof HTMLTextAreaElement) {
+                return;
+            }
+            if (
+                target instanceof HTMLButtonElement && target.type === 'submit'
+            ) {
+                return;
+            }
+            if (
+                target instanceof HTMLInputElement && target.type === 'submit'
+            ) {
+                return;
+            }
+            const submitBtn = target.closest('button[type=submit], input[type=submit]');
+            if (submitBtn) {
+                return;
+            }
+            event.preventDefault();
+        },
     }"
 >
     @if ($isPreview)
@@ -611,18 +641,15 @@ new #[Title('Take Exam')] class extends Component {
         </div>
     @endif
 
-        <div class="flex items-center justify-between" x-bind:class="{ 'pointer-events-none opacity-70 select-none': showViolationModal || isFinishingExam }">
-        <div>
+        <div class="space-y-1" x-bind:class="{ 'pointer-events-none opacity-70 select-none': showViolationModal || isFinishingExam }">
             <flux:heading size="xl">{{ $exam->title }}</flux:heading>
-            <div class="flex items-center gap-3 mt-1">
+            <div class="flex flex-wrap items-center gap-3 mt-1">
                 <flux:text>{{ $this->questions->count() }} questions</flux:text>
                 @if ($exam->time_limit)
                     <flux:text>• {{ $exam->time_limit }} minute limit</flux:text>
                 @endif
             </div>
         </div>
-        <flux:button variant="ghost" type="button" x-on:click.prevent="handleManualExit()">Exit Test</flux:button>
-    </div>
 
     {{-- ── Countdown Timer ── --}}
     @if ($exam->time_limit)
@@ -735,6 +762,7 @@ new #[Title('Take Exam')] class extends Component {
         id="quizForm"
         wire:submit="submitExam"
         x-on:submit="if (!isFinishingExam) { isExitingPage = true; isFinishingExam = true; }"
+        x-on:keydown.enter.capture="suppressExamEnterSubmit($event)"
         x-bind:class="{ 'pointer-events-none opacity-70 select-none': showViolationModal || isFinishingExam }"
         class="space-y-4"
     >
