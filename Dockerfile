@@ -35,9 +35,11 @@ RUN npm run build
 RUN php artisan config:cache || true
 RUN php artisan route:cache || true
 RUN php artisan view:cache || true
+RUN php artisan cache:clear || true
+RUN php artisan migrate --force || true
 
 # Expose port
 EXPOSE 10000
 
 # Start app
-CMD php artisan config:clear && php artisan cache:clear && php artisan migrate:fresh --force && php artisan storage:link || true && php artisan optimize && php artisan serve --host=0.0.0.0 --port=10000
+CMD php artisan storage:link || true && php artisan optimize && php artisan serve --host=0.0.0.0 --port=10000
