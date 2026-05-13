@@ -342,7 +342,7 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
             'exam_title_snapshot'   => $this->exam->title,
         ]);
 
-        GenerateAttemptEmbeddingJob::dispatch($this->attempt);
+        // GenerateAttemptEmbeddingJob::dispatch($this->attempt);
 
         // Broadcast live submission counter to teacher dashboard
         if (config('broadcasting.default') === 'reverb') {
