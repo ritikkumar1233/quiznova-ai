@@ -16,6 +16,7 @@ class QuestionSimilarityService
             ->whereNotNull('embedding')
             ->when($excludeExamId, fn ($q) => $q->where('exam_id', '!=', $excludeExamId))
             ->whereVectorSimilarTo('embedding', $query, minSimilarity: 0.3)
+            ->with(['exam' => fn ($q) => $q->withTrashed()])
             ->limit($limit)
             ->get();
     }

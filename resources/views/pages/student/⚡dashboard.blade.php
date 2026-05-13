@@ -32,7 +32,7 @@ new #[Title('Available Exams')] class extends Component {
     public function myAttempts(): \Illuminate\Database\Eloquent\Collection
     {
         return auth()->user()->attempts()
-            ->with('exam')
+            ->with(['exam' => fn ($q) => $q->withTrashed()->select('id', 'title', 'deleted_at')])
             ->latest()
             ->limit(5)
             ->get();
@@ -66,12 +66,11 @@ new #[Title('Available Exams')] class extends Component {
     {
         return auth()->user()->attempts()
             ->completed()
-            ->whereHas('exam')
-            ->with('exam:id,title')
+            ->with(['exam' => fn ($q) => $q->withTrashed()->select('id', 'title', 'deleted_at')])
             ->orderBy('completed_at')
             ->get()
             ->map(fn ($attempt) => [
-                'label' => $attempt->exam->title.' ('.$attempt->completed_at->format('M j').')',
+                'label' => $attempt->displayExamTitle().' ('.$attempt->completed_at->format('M j').')',
                 'score' => $attempt->score,
                 'date' => $attempt->completed_at->format('M j, Y'),
             ])
@@ -176,7 +175,7 @@ new #[Title('Available Exams')] class extends Component {
                     <flux:table.rows>
                         @foreach ($this->myAttempts as $attempt)
                             <flux:table.row :key="$attempt->id">
-                                <flux:table.cell variant="strong">{{ $attempt->exam?->title ?? 'Exam no longer available' }}</flux:table.cell>
+                                <flux:table.cell variant="strong">{{ $attempt->displayExamTitle() }}</flux:table.cell>
                                 <flux:table.cell>
                                     {{ $attempt->score !== null ? $attempt->score.'%' : '—' }}
                                 </flux:table.cell>
@@ -187,7 +186,13 @@ new #[Title('Available Exams')] class extends Component {
                                         <flux:badge color="yellow" size="sm">In Progress</flux:badge>
                                     @endif
                                 </flux:table.cell>
-                                <flux:table.cell>{{ $attempt->started_at?->diffForHumans() }}</flux:table.cell>
+                                <flux:table.cell>
+                                    @if ($attempt->isCompleted())
+                                        {{ $attempt->completed_at?->format('M j, Y') }}
+                                    @else
+                                        {{ $attempt->started_at?->diffForHumans() }}
+                                    @endif
+                                </flux:table.cell>
                                 <flux:table.cell>
                                     @if ($attempt->isCompleted())
                                         <flux:button
@@ -198,7 +203,7 @@ new #[Title('Available Exams')] class extends Component {
                                         >
                                             View Results
                                         </flux:button>
-                                    @elseif ($attempt->exam)
+                                    @elseif ($attempt->exam && ! $attempt->exam->trashed())
                                         <flux:button
                                             size="sm"
                                             variant="ghost"
@@ -207,6 +212,8 @@ new #[Title('Available Exams')] class extends Component {
                                         >
                                             Continue
                                         </flux:button>
+                                    @elseif ($attempt->exam && $attempt->exam->trashed())
+                                        <flux:text size="sm" class="text-zinc-500">Exam archived by instructor</flux:text>
                                     @else
                                         <flux:text size="sm" class="text-zinc-500">Unavailable</flux:text>
                                     @endif

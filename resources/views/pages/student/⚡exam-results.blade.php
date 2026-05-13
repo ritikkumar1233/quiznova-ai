@@ -4,6 +4,7 @@ use App\Enums\QuestionType;
 use App\Jobs\ExportStudentResultJob;
 use App\Models\Attempt;
 use App\Services\QuestionSimilarityService;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -15,6 +16,33 @@ new #[Title('Exam Results')] class extends Component {
     {
         abort_unless(auth()->id() === $this->attempt->user_id, 403);
         abort_unless($this->attempt->isCompleted(), 404);
+
+        $this->attempt->loadMissing([
+            'exam' => fn ($q) => $q->withTrashed(),
+        ]);
+
+        if ($this->attempt->exam) {
+            $this->attempt->loadMissing('exam.questions');
+        }
+    }
+
+    /**
+     * Questions for this result view (empty if the exam record was permanently removed).
+     *
+     * @return EloquentCollection<int, \App\Models\Question>
+     */
+    #[Computed]
+    public function resultQuestions(): EloquentCollection
+    {
+        $exam = $this->attempt->exam;
+
+        if ($exam === null) {
+            return new EloquentCollection;
+        }
+
+        return $exam->relationLoaded('questions')
+            ? $exam->questions
+            : $exam->questions()->get();
     }
 
     #[Computed]
@@ -22,7 +50,7 @@ new #[Title('Exam Results')] class extends Component {
     {
         $correct = 0;
 
-        foreach ($this->attempt->exam->questions as $question) {
+        foreach ($this->resultQuestions as $question) {
             $given = $this->attempt->answers[$question->id] ?? null;
 
             if ($given === null) {
@@ -60,7 +88,7 @@ new #[Title('Exam Results')] class extends Component {
     #[Computed]
     public function totalCount(): int
     {
-        return $this->attempt->exam->questions->count();
+        return $this->resultQuestions->count();
     }
 
     public function requestExport(): void
@@ -76,9 +104,13 @@ new #[Title('Exam Results')] class extends Component {
     #[Computed]
     public function recommendations(): \Illuminate\Database\Eloquent\Collection
     {
+        if ($this->resultQuestions->isEmpty()) {
+            return new \Illuminate\Database\Eloquent\Collection;
+        }
+
         $incorrectTexts = [];
 
-        foreach ($this->attempt->exam->questions as $question) {
+        foreach ($this->resultQuestions as $question) {
             $given = $this->attempt->answers[$question->id] ?? null;
 
             if ($given === null) {
@@ -125,8 +157,24 @@ new #[Title('Exam Results')] class extends Component {
     <div class="mx-auto max-w-3xl flex flex-col gap-6">
     <div class="flex items-center gap-4">
         <flux:button variant="ghost" icon="arrow-left" :href="route('student.dashboard')" wire:navigate />
-        <flux:heading size="xl">Results: {{ $attempt->exam->title }}</flux:heading>
+        <flux:heading size="xl">Results: {{ $attempt->displayExamTitle() }}</flux:heading>
     </div>
+
+    @if ($attempt->exam?->trashed())
+        <flux:callout variant="warning" icon="information-circle">
+            <flux:callout.text>
+                This exam was archived by your instructor. Your score and answers below are preserved.
+            </flux:callout.text>
+        </flux:callout>
+    @endif
+
+    @if (! $attempt->exam && $attempt->exam_title_snapshot)
+        <flux:callout variant="warning" icon="information-circle">
+            <flux:callout.text>
+                The original exam is no longer in the system. Your score is shown below; detailed question review may be unavailable.
+            </flux:callout.text>
+        </flux:callout>
+    @endif
 
     {{-- Score Card --}}
     <div class="bento-flat p-8 text-center space-y-3">
@@ -161,7 +209,14 @@ new #[Title('Exam Results')] class extends Component {
                         <div class="flex-1 min-w-0">
                             <flux:text class="font-medium">{{ $rec->question }}</flux:text>
                             <flux:text size="sm" class="mt-0.5">
-                                From: <a href="{{ route('student.exams.take', $rec->exam) }}" wire:navigate class="text-teal-600 hover:underline">{{ $rec->exam->title }}</a>
+                                From:
+                                @if ($rec->exam && ! $rec->exam->trashed())
+                                    <a href="{{ route('student.exams.take', $rec->exam) }}" wire:navigate class="text-teal-600 hover:underline">{{ $rec->exam->title }}</a>
+                                @elseif ($rec->exam)
+                                    <span class="text-zinc-600">{{ $rec->exam->title }} <span class="text-xs">({{ __('Archived') }})</span></span>
+                                @else
+                                    <span class="text-zinc-600">{{ __('Unknown exam') }}</span>
+                                @endif
                             </flux:text>
                         </div>
                     </div>
@@ -172,8 +227,13 @@ new #[Title('Exam Results')] class extends Component {
 
     {{-- Question Review --}}
     <flux:heading size="lg">Question Review</flux:heading>
+    @if ($this->resultQuestions->isEmpty())
+        <div class="bento-flat py-8 text-center">
+            <flux:text>Question-level review is not available for this result.</flux:text>
+        </div>
+    @else
     <div class="space-y-3">
-        @foreach ($attempt->exam->questions as $index => $question)
+        @foreach ($this->resultQuestions as $index => $question)
             @php
                 $given = $attempt->answers[$question->id] ?? null;
                 $isAiGraded = is_array($given) && ($given['ai_graded'] ?? false);
@@ -257,6 +317,7 @@ new #[Title('Exam Results')] class extends Component {
             </div>
         @endforeach
     </div>
+    @endif
 
     <div class="flex justify-center gap-3 flex-wrap">
         <flux:button variant="outline" wire:click="requestExport" wire:loading.attr="disabled"
@@ -270,7 +331,7 @@ new #[Title('Exam Results')] class extends Component {
                 Queuing…
             </span>
         </flux:button>
-        @if ($attempt->exam->leaderboard_enabled)
+        @if ($attempt->exam && ! $attempt->exam->trashed() && $attempt->exam->leaderboard_enabled)
             <flux:button variant="outline" icon="chart-bar" :href="route('student.exams.leaderboard', $attempt->exam)"
                 wire:navigate>
                 View Leaderboard

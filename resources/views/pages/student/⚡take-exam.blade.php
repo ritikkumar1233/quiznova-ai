@@ -336,9 +336,10 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
             : 0;
 
         $this->attempt->update([
-            'answers'      => $this->answers,
-            'score'        => $score,
-            'completed_at' => now(),
+            'answers'               => $this->answers,
+            'score'                 => $score,
+            'completed_at'          => now(),
+            'exam_title_snapshot'   => $this->exam->title,
         ]);
 
         GenerateAttemptEmbeddingJob::dispatch($this->attempt);

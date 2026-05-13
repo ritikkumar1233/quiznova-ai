@@ -20,10 +20,16 @@ class ExportStudentResultJob implements ShouldQueue
 
     public function handle(): void
     {
-        $attempt = Attempt::with(['exam.questions', 'student'])->findOrFail($this->attemptId);
+        $attempt = Attempt::query()
+            ->with([
+                'exam' => fn ($q) => $q->withTrashed(),
+                'exam.questions',
+                'student',
+            ])
+            ->findOrFail($this->attemptId);
 
         $correctCount = $this->computeCorrectCount($attempt);
-        $totalCount = $attempt->exam->questions->count();
+        $totalCount = $attempt->exam?->questions->count() ?? 0;
 
         $pdf = Pdf::loadView('pdf.student-result', compact('attempt', 'correctCount', 'totalCount'));
         $path = 'exports/'.Str::uuid().'-result.pdf';
@@ -38,7 +44,7 @@ class ExportStudentResultJob implements ShouldQueue
 
         Mail::to($attempt->student->email)->send(
             new ExportReadyMail(
-                mailSubject: 'Your result for "'.$attempt->exam->title.'" is ready',
+                mailSubject: 'Your result for "'.$attempt->displayExamTitle().'" is ready',
                 downloadUrl: $downloadUrl,
                 expiresAt: now()->addHours(24),
             )
@@ -48,6 +54,10 @@ class ExportStudentResultJob implements ShouldQueue
     private function computeCorrectCount(Attempt $attempt): int
     {
         $correct = 0;
+
+        if (! $attempt->exam) {
+            return 0;
+        }
 
         foreach ($attempt->exam->questions as $question) {
             $given = $attempt->answers[$question->id] ?? null;

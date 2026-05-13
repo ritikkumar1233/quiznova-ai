@@ -82,7 +82,7 @@ it('progress chart data only includes own attempts', function () {
         ->assertSet('progressChartData', []);
 });
 
-it('progress chart omits attempts whose exam was soft-deleted', function () {
+it('progress chart data includes attempts whose exam was soft-deleted', function () {
     $student = User::factory()->student()->create();
     $exam = Exam::factory()->published()->create();
 
@@ -94,7 +94,8 @@ it('progress chart omits attempts whose exam was soft-deleted', function () {
         ->instance()
         ->progressChartData;
 
-    expect($data)->toBeEmpty();
+    expect($data)->toHaveCount(1)
+        ->and($data[0]['score'])->toBe(72);
 });
 
 it('student dashboard loads when a recent attempt references a soft-deleted exam', function () {

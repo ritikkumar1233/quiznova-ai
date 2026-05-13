@@ -35,8 +35,14 @@ new #[Title('My Attempts')] class extends Component {
     {
         return auth()->user()->attempts()
             ->completed()
-            ->with('exam:id,title')
-            ->when($this->search, fn ($q) => $q->whereHas('exam', fn ($q) => $q->where('title', 'ilike', '%'.$this->search.'%')))
+            ->with(['exam' => fn ($q) => $q->withTrashed()->select('id', 'title', 'deleted_at')])
+            ->when($this->search, function ($query) {
+                $term = '%'.$this->search.'%';
+                $query->where(function ($w) use ($term) {
+                    $w->whereHas('exam', fn ($e) => $e->withTrashed()->where('title', 'ilike', $term))
+                        ->orWhere('exam_title_snapshot', 'ilike', $term);
+                });
+            })
             ->orderBy($this->sortBy, $this->sortDir)
             ->paginate(15);
     }
@@ -85,7 +91,7 @@ new #[Title('My Attempts')] class extends Component {
         <flux:table.rows>
             @forelse ($this->attempts as $attempt)
                 <flux:table.row :key="$attempt->id">
-                    <flux:table.cell variant="strong">{{ $attempt->exam?->title ?? 'Exam no longer available' }}</flux:table.cell>
+                    <flux:table.cell variant="strong">{{ $attempt->displayExamTitle() }}</flux:table.cell>
                     <flux:table.cell>
                         <span class="{{ $attempt->score >= 70 ? 'score-pass' : ($attempt->score >= 50 ? 'score-warn' : 'score-fail') }} font-bold">
                             {{ $attempt->score }}%

@@ -35,10 +35,12 @@ class Question extends Model
         ];
     }
 
-    /** @return BelongsTo<Exam, $this> */
+    /**
+     * @return BelongsTo<Exam, $this>
+     */
     public function exam(): BelongsTo
     {
-        return $this->belongsTo(Exam::class);
+        return $this->belongsTo(Exam::class)->withTrashed();
     }
 
     /**

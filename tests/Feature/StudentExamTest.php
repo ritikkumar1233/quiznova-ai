@@ -215,3 +215,24 @@ it('returns 404 for incomplete attempt results', function () {
         ->get(route('student.attempts.results', $attempt))
         ->assertNotFound();
 });
+
+it('student can view results after teacher soft-deletes the exam', function () {
+    $student = User::factory()->student()->create();
+    $teacher = User::factory()->teacher()->create();
+    $exam = Exam::factory()->published()->for($teacher)->has(Question::factory()->count(2), 'questions')->create([
+        'title' => 'Retention Test Exam',
+    ]);
+
+    $attempt = Attempt::factory()->completed()->for($exam)->for($student, 'student')->create([
+        'score' => 88,
+        'exam_title_snapshot' => 'Retention Test Exam',
+    ]);
+
+    $exam->delete();
+
+    Livewire::actingAs($student)
+        ->test('pages::student.exam-results', ['attempt' => $attempt->fresh()])
+        ->assertOk()
+        ->assertSee('Retention Test Exam')
+        ->assertSee('88%');
+});

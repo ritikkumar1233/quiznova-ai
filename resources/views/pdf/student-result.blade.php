@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Exam Result — {{ $attempt->exam->title }}</title>
+    <title>Exam Result — {{ $attempt->displayExamTitle() }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #1a1a1a; background: #fff; padding: 32px; }
@@ -51,12 +51,12 @@
     <div class="header">
         <div>
             <h1>Exam Result</h1>
-            <div style="font-size:13px; color:#374151; margin-top:4px;">{{ $attempt->exam->title }}</div>
+            <div style="font-size:13px; color:#374151; margin-top:4px;">{{ $attempt->displayExamTitle() }}</div>
         </div>
         <div class="meta">
             <div><strong>Student:</strong> {{ $attempt->student->name }}</div>
             <div><strong>Submitted:</strong> {{ $attempt->completed_at->format('d M Y, H:i') }}</div>
-            @if ($attempt->exam->time_limit)
+            @if ($attempt->exam && $attempt->exam->time_limit)
                 <div><strong>Time Limit:</strong> {{ $attempt->exam->time_limit }} min</div>
             @endif
         </div>
@@ -77,6 +77,7 @@
     {{-- Question breakdown --}}
     <h2>Question Review</h2>
 
+    @if ($attempt->exam && $attempt->exam->questions->isNotEmpty())
     @foreach ($attempt->exam->questions as $index => $question)
         @php
             $given      = $attempt->answers[$question->id] ?? null;
@@ -127,6 +128,9 @@
             @endif
         </div>
     @endforeach
+    @else
+        <p style="font-size:11px; color:#6b7280;">Detailed question breakdown is not available for this result.</p>
+    @endif
 
     <div class="footer">
         <span>{{ config('app.name') }}</span>
