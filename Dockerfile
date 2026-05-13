@@ -31,15 +31,17 @@ RUN npm install
 # Build Vite assets
 RUN npm run build
 
-# Laravel optimizations
-RUN php artisan config:cache || true
-RUN php artisan route:cache || true
-RUN php artisan view:cache || true
+# Laravel caches
+RUN php artisan config:clear || true
 RUN php artisan cache:clear || true
-RUN php artisan migrate --force || true
+RUN php artisan route:clear || true
+RUN php artisan view:clear || true
+
+# Make startup script executable
+RUN chmod +x start.sh
 
 # Expose port
 EXPOSE 10000
 
 # Start app
-CMD php artisan storage:link || true && php artisan optimize && php artisan serve --host=0.0.0.0 --port=10000
+CMD ["sh", "start.sh"]
