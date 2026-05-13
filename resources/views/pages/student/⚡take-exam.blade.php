@@ -18,6 +18,10 @@ use Livewire\Component;
 
 new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
     public Exam $exam;
+
+    /** Persisted across Livewire requests so submit always targets the correct row. */
+    public ?int $attemptId = null;
+
     public ?Attempt $attempt = null;
 
     /**
@@ -47,35 +51,73 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
         if ($this->isPreview) {
             // Only the exam's owner may preview
             abort_unless(auth()->id() === $this->exam->user_id, 403);
-        } else {
-            abort_unless($this->exam->isPublished(), 404);
+            $this->normalizeAnswers();
+
+            return;
         }
 
-        if (! $this->isPreview) {
-            $this->attempt = auth()->user()->attempts()
+        abort_unless($this->exam->isPublished(), 404);
+
+        $this->attempt = auth()->user()->attempts()
+            ->where('exam_id', $this->exam->id)
+            ->whereNull('completed_at')
+            ->latest()
+            ->first();
+
+        if (! $this->attempt) {
+            $this->attempt = auth()->user()->attempts()->create([
+                'exam_id'    => $this->exam->id,
+                'started_at' => now(),
+            ]);
+        }
+
+        $this->attemptId = $this->attempt->id;
+
+        $this->answers = $this->attempt->answers ?? [];
+
+        if ($this->attempt->violations >= $this->maxViolations && ! $this->attempt->isCompleted()) {
+            $this->submittedForViolations = true;
+            $this->submitExam();
+
+            return;
+        }
+
+        $this->normalizeAnswers();
+    }
+
+    /**
+     * Reload the in-progress attempt from the database (Livewire may not reliably
+     * round-trip full Eloquent models on every request).
+     */
+    private function syncAttemptFromDatabase(): void
+    {
+        if ($this->isPreview) {
+            return;
+        }
+
+        if ($this->attemptId !== null) {
+            $fresh = Attempt::query()
+                ->whereKey($this->attemptId)
+                ->where('user_id', auth()->id())
                 ->where('exam_id', $this->exam->id)
-                ->whereNull('completed_at')
-                ->latest()
                 ->first();
 
-            if (! $this->attempt) {
-                $this->attempt = auth()->user()->attempts()->create([
-                    'exam_id'    => $this->exam->id,
-                    'started_at' => now(),
-                ]);
-            }
-
-            $this->answers = $this->attempt->answers ?? [];
-
-            if ($this->attempt->violations >= $this->maxViolations && ! $this->attempt->isCompleted()) {
-                $this->submittedForViolations = true;
-                $this->submitExam();
+            if ($fresh) {
+                $this->attempt = $fresh;
 
                 return;
             }
         }
 
-        $this->normalizeAnswers();
+        $this->attempt = auth()->user()->attempts()
+            ->where('exam_id', $this->exam->id)
+            ->whereNull('completed_at')
+            ->latest()
+            ->first();
+
+        if ($this->attempt) {
+            $this->attemptId = $this->attempt->id;
+        }
     }
 
     /**
@@ -130,6 +172,12 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
             return;
         }
 
+        $this->syncAttemptFromDatabase();
+
+        if (! $this->attempt) {
+            return;
+        }
+
         if ($this->timeRemaining <= 0) {
             $this->timedOut = true;
             $this->submitExam();
@@ -142,6 +190,12 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
      */
     public function toggleFlag(int $questionId): void
     {
+        $this->syncAttemptFromDatabase();
+
+        if (! $this->attempt) {
+            return;
+        }
+
         if (! isset($this->answers[$questionId])) {
             $this->answers[$questionId] = ['value' => '', 'flagged' => true];
         } else {
@@ -154,6 +208,12 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
     public function streamHint(int $questionId): void
     {
     // No global daily budget or rate limit enforced for hints in demo mode.
+
+        $this->syncAttemptFromDatabase();
+
+        if (! $this->attempt) {
+            return;
+        }
 
         $question = $this->exam->questions->firstWhere('id', $questionId);
 
@@ -193,6 +253,26 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
             return;
         }
 
+        $this->syncAttemptFromDatabase();
+
+        if ($this->attempt === null) {
+            $finished = auth()->user()->attempts()
+                ->where('exam_id', $this->exam->id)
+                ->whereNotNull('completed_at')
+                ->latest('completed_at')
+                ->first();
+
+            if ($finished) {
+                $this->redirect(route('student.attempts.results', $finished), navigate: true);
+
+                return;
+            }
+
+            $this->addError('submit', 'Your exam session could not be found. Please reopen the exam from the dashboard.');
+
+            return;
+        }
+
         // Idempotency guard — already submitted (double-click or race condition)
         if ($this->attempt->isCompleted()) {
             $this->redirect(route('student.attempts.results', $this->attempt), navigate: true);
@@ -200,8 +280,8 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
             return;
         }
 
-        // Skip validation on auto-submit; answers may be partial
-        if (! $this->timedOut) {
+        // Skip validation on auto-submit / disqualification; answers may be partial
+        if (! $this->timedOut && ! $this->submittedForViolations) {
             $this->validate([
                 'answers'           => 'array',
                 'answers.*.value'   => 'nullable|string|max:500',
@@ -321,11 +401,21 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
         isHandlingViolation: false,
         isExitingPage: false,
         isFinishingExam: false,
-        lastViolationAt: 0,
+        lastTabViolationAt: 0,
+        lastFullscreenViolationAt: 0,
+        _examGraceTimer: null,
         pendingF11Exit: false,
         violationEndpoint: @js($attempt ? route('student.attempts.violations', $attempt) : ''),
         csrfToken: @js(csrf_token()),
+        setExamSubmitGrace() {
+            window.__examGracefulSubmit = true;
+            clearTimeout(this._examGraceTimer);
+            this._examGraceTimer = setTimeout(() => {
+                window.__examGracefulSubmit = false;
+            }, 3500);
+        },
         async init() {
+            window.__examGracefulSubmit = false;
             if (!this.isPreview) {
                 // Keep the student on this route when using the browser Back button (no `beforeunload` dialog).
                 history.pushState({ examMode: true }, '', window.location.href);
@@ -345,6 +435,8 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
             await this.enterFullscreen();
 
             const leaveFullscreen = () => {
+                window.__examGracefulSubmit = false;
+                clearTimeout(this._examGraceTimer);
                 this.isExitingPage = true;
                 this.exitFullscreenSafely();
             };
@@ -412,33 +504,41 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
 
             this.isFinishingExam = true;
             this.isExitingPage = true;
+            this.setExamSubmitGrace();
 
             // Exit fullscreen before submitting. A brief delay helps browsers settle
             // fullscreen state to avoid race conditions with Livewire/form submit.
             await this.exitFullscreenSafely();
             await new Promise((resolve) => setTimeout(resolve, 260));
 
-            const quizForm = document.getElementById('quizForm');
             let livewireSubmitted = false;
 
             try {
                 console.log('Submitting exam...');
-                await Promise.race([
-                    $wire.submitExam(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Livewire submit timeout')), 3000)),
-                ]);
+                await $wire.submitExam();
                 livewireSubmitted = true;
             } catch (error) {
-                // Fallback is mandatory to guarantee submission even if Livewire fails/times out.
+                console.warn('submitExam failed, retrying once', error);
             }
 
-            if (!livewireSubmitted && quizForm) {
-                console.log('Fallback submit triggered');
-                quizForm.submit();
+            if (! livewireSubmitted) {
+                try {
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                    await $wire.submitExam();
+                    livewireSubmitted = true;
+                } catch (error) {
+                    console.error('Exam submit failed after retry', error);
+                    this.isFinishingExam = false;
+                    this.isExitingPage = false;
+                    window.__examGracefulSubmit = false;
+                }
             }
         },
         async handleFullscreenChange() {
             if (this.isPreview || this.isExitingPage || document.fullscreenElement || this.isHandlingViolation) {
+                return;
+            }
+            if (window.__examGracefulSubmit) {
                 return;
             }
 
@@ -451,12 +551,23 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
             if (this.isPreview || this.isExitingPage || this.isHandlingViolation) {
                 return;
             }
+            if (window.__examGracefulSubmit) {
+                return;
+            }
 
             if (document.hidden) {
                 await this.registerViolation('tab_switch');
             }
         },
         async registerViolation(reason) {
+            if (window.__examGracefulSubmit) {
+                if (reason === 'f11_exit' || reason === 'fullscreen_exit') {
+                    this.pendingF11Exit = false;
+                }
+
+                return;
+            }
+
             const now = Date.now();
             const isTabSwitch = reason === 'tab_switch';
             const violationEvent = isTabSwitch ? 'tab_switch' : 'fullscreen_exit';
@@ -464,11 +575,17 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
                 ? 'Tab switch detected. Stay on the exam tab during the test.'
                 : 'You must stay in fullscreen mode during the exam.';
 
-            if (this.isHandlingViolation || now - this.lastViolationAt < 1200) {
+            const lastAt = isTabSwitch ? this.lastTabViolationAt : this.lastFullscreenViolationAt;
+            const debounceMs = isTabSwitch ? 450 : 650;
+            if (this.isHandlingViolation || now - lastAt < debounceMs) {
                 return;
             }
 
-            this.lastViolationAt = now;
+            if (isTabSwitch) {
+                this.lastTabViolationAt = now;
+            } else {
+                this.lastFullscreenViolationAt = now;
+            }
             this.isHandlingViolation = true;
             this.warningMessage = baseWarning;
             this.modalTitle = 'Fullscreen Required';
@@ -754,8 +871,8 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
 
     <form
         id="quizForm"
-        wire:submit="submitExam"
-        x-on:submit="if (!isFinishingExam) { isExitingPage = true; isFinishingExam = true; }"
+        wire:submit.prevent="submitExam"
+        x-on:submit.capture="setExamSubmitGrace()"
         x-on:keydown.enter.capture="suppressExamEnterSubmit($event)"
         x-bind:class="{ 'pointer-events-none opacity-70 select-none': showViolationModal || isFinishingExam }"
         class="space-y-4"
@@ -788,19 +905,26 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
                     </button>
                 </div>
 
-                @if ($question->options)
-                    <div class="space-y-2 pt-1">
-                        @foreach ($question->options as $option)
-                            <label class="quiz-option" wire:key="opt-{{ $question->id }}-{{ $loop->index }}">
-                                <input
-                                    type="radio"
-                                    wire:model="answers.{{ $question->id }}.value"
-                                    value="{{ $option }}"
-                                />
-                                <span>{{ $option }}</span>
-                            </label>
-                        @endforeach
-                    </div>
+                @if ($question->type->hasOptions())
+                    @if ($question->choiceOptions)
+                        <div class="space-y-2 pt-1">
+                            @foreach ($question->choiceOptions as $option)
+                                <label class="quiz-option" wire:key="opt-{{ $question->id }}-{{ $loop->index }}">
+                                    <input
+                                        type="radio"
+                                        name="exam-question-{{ $question->id }}"
+                                        wire:model="answers.{{ $question->id }}.value"
+                                        value="{{ $option }}"
+                                    />
+                                    <span>{{ $option }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    @else
+                        <flux:callout variant="warning" icon="exclamation-triangle">
+                            <flux:callout.text>This question has no answer choices configured. Contact your instructor.</flux:callout.text>
+                        </flux:callout>
+                    @endif
                 @else
                     <flux:input
                         wire:model="answers.{{ $question->id }}.value"
@@ -852,11 +976,18 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
                     <flux:callout.text>Preview mode — submission is disabled.</flux:callout.text>
                 </flux:callout>
             @else
+                <div class="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-end">
+                @error('submit')
+                    <flux:callout variant="danger" icon="exclamation-triangle" class="w-full md:max-w-md">
+                        <flux:callout.text>{{ $message }}</flux:callout.text>
+                    </flux:callout>
+                @enderror
                 <flux:button
                     variant="primary"
                     type="submit"
                     wire:loading.attr="disabled"
                     wire:target="submitExam"
+                    class="md:ml-auto"
                 >
                     <span wire:loading.remove wire:target="submitExam" class="inline-flex items-center gap-1">
                         <flux:icon.check class="size-4" />
@@ -867,6 +998,7 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
                         Grading…
                     </span>
                 </flux:button>
+                </div>
             @endif
         </div>
     </form>

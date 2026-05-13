@@ -4,10 +4,9 @@ use App\Ai\Agents\QuestionGeneratorAgent;
 use App\Ai\ResolvedProviders;
 use App\Enums\QuestionType;
 use App\Jobs\ImportQuestionsFromCsvJob;
-use App\Jobs\ProcessGeneratedQuestionsJob;
 use App\Models\Exam;
 use App\Models\Question;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
@@ -35,10 +34,17 @@ new #[Title('Manage Questions')] class extends Component {
     #[Validate('required|string|max:200')]
     public string $aiTopic = '';
 
-    public string $aiType = QuestionType::MultipleChoice->value;
+    public bool $aiMixMultipleChoice = true;
 
-    #[Validate('required|integer|min:1|max:10')]
-    public int $aiCount = 5;
+    public int $aiCountMultipleChoice = 5;
+
+    public bool $aiMixTrueFalse = false;
+
+    public int $aiCountTrueFalse = 3;
+
+    public bool $aiMixShortAnswer = false;
+
+    public int $aiCountShortAnswer = 2;
 
     #[Validate('required|integer|min:1|max:5')]
     public int $aiDifficulty = 3;
@@ -180,68 +186,15 @@ new #[Title('Manage Questions')] class extends Component {
     }
 
     /**
-     * Queued generation path — used for batches > 5.
-     * Also kept for backward-compat with existing tests.
+     * Backward-compatible entry point: all generation runs synchronously.
      */
     public function generateWithAi(): void
     {
-        $providers = ResolvedProviders::list();
-
-        if (empty($providers)) {
-            $this->aiError = 'No AI providers are configured. Add a provider API key or set OLLAMA_BASE_URL to use Ollama.';
-
-            return;
-        }
-
-    // No daily budget or rate limit enforced for demo mode.
-
-        $this->validateOnly('aiTopic');
-        $this->validateOnly('aiCount');
-        $this->validateOnly('aiDifficulty');
-
-        $this->aiError = '';
-        $this->aiGenerating = true;
-        $this->pendingAiQuestions = [];
-
-        try {
-            $agent = new QuestionGeneratorAgent(
-                topic: $this->aiTopic,
-                type: $this->aiType,
-                count: $this->aiCount,
-                difficulty: $this->aiDifficulty,
-            );
-
-            $examId = $this->exam->id;
-
-            $agent->queue(
-                "Generate {$this->aiCount} questions about {$this->aiTopic}.",
-                provider: $providers,
-            )->then(function ($response) use ($examId) {
-                $data = json_decode($response->text, true);
-
-                if (! is_array($data) || ! isset($data['questions'])) {
-                    throw new \RuntimeException('AI response invalid.');
-                }
-
-                ProcessGeneratedQuestionsJob::dispatch(
-                    $examId,
-                    $data['questions'] ?? [],
-                );
-            });
-
-            $this->dispatch('toast', heading: 'Queued', text: "Generating {$this->aiCount} questions in the background. Refresh in a moment.");
-        } catch (\Throwable $e) {
-            logger()->error('AI generation failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            $this->aiError = 'AI generation failed. Check your AI provider keys or Ollama server, then try again.';
-        } finally {
-            $this->aiGenerating = false;
-        }
+        $this->streamGenerateWithAi();
     }
 
     /**
-     * Synchronous generation path — uses prompt() instead of stream() because
-     * QuestionGeneratorAgent uses HasStructuredOutput which does not support
-     * streaming on all providers (e.g. Gemini).
+     * Synchronous mixed-type generation — one prompt() per selected type, then merge, shuffle, and dedupe.
      */
     public function streamGenerateWithAi(): void
     {
@@ -253,39 +206,49 @@ new #[Title('Manage Questions')] class extends Component {
             return;
         }
 
-    // No daily budget or rate limit enforced for demo mode.
-
         $this->validateOnly('aiTopic');
-        $this->validateOnly('aiCount');
         $this->validateOnly('aiDifficulty');
+
+        $this->validateAiMixCounts();
 
         $this->aiError = '';
         $this->aiGenerating = true;
         $this->pendingAiQuestions = [];
 
         try {
-            $agent = new QuestionGeneratorAgent(
-                topic: $this->aiTopic,
-                type: $this->aiType,
-                count: $this->aiCount,
-                difficulty: $this->aiDifficulty,
-            );
+            $merged = [];
 
-            $response = $agent->prompt(
-                "Generate {$this->aiCount} questions about {$this->aiTopic}.",
-                provider: $providers,
-            );
+            foreach ($this->typeMixSpecifications() as $spec) {
+                $agent = new QuestionGeneratorAgent(
+                    topic: $this->aiTopic,
+                    type: $spec['type'],
+                    count: $spec['count'],
+                    difficulty: $this->aiDifficulty,
+                );
 
-            $data = json_decode($response->text, true);
+                $response = $agent->prompt(
+                    "Generate {$spec['count']} questions about {$this->aiTopic}.",
+                    provider: $providers,
+                );
 
-            if (! is_array($data) || ! isset($data['questions'])) {
-                throw new \RuntimeException('AI response invalid.');
+                $data = json_decode($response->text, true);
+
+                if (! is_array($data) || ! isset($data['questions'])) {
+                    throw new \RuntimeException('AI response invalid.');
+                }
+
+                foreach ($data['questions'] as $row) {
+                    if (is_array($row)) {
+                        $merged[] = $row;
+                    }
+                }
             }
 
-            $this->pendingAiQuestions = $data['questions'] ?? [];
+            $this->pendingAiQuestions = $this->dedupeAiQuestionsByText($merged);
+            $this->pendingAiQuestions = collect($this->pendingAiQuestions)->shuffle()->values()->all();
 
             if (count($this->pendingAiQuestions) > 0) {
-                $this->saveToHistory();
+                $this->saveToHistory('ai');
             }
         } catch (\Throwable $e) {
             logger()->error('AI generation failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
@@ -293,6 +256,191 @@ new #[Title('Manage Questions')] class extends Component {
         } finally {
             $this->aiGenerating = false;
         }
+    }
+
+    /**
+     * Build a mixed-type set from the teacher's other exams using random selection (synchronous).
+     */
+    public function importMixedRandomFromBank(): void
+    {
+        $this->aiError = '';
+
+        try {
+            $this->validateAiMixCounts();
+        } catch (ValidationException $e) {
+            throw $e;
+        }
+
+        $this->assertBankHasEnoughQuestions();
+
+        $specs = $this->typeMixSpecifications();
+        $picked = collect();
+
+        foreach ($specs as $spec) {
+            $batch = Question::query()
+                ->whereHas('exam', fn ($q) => $q->where('user_id', auth()->id()))
+                ->where('exam_id', '!=', $this->exam->id)
+                ->where('type', $spec['type'])
+                ->inRandomOrder()
+                ->limit($spec['count'])
+                ->get();
+
+            $picked = $picked->merge($batch);
+        }
+
+        $picked = $picked->unique('id')->shuffle()->values();
+
+        $this->pendingAiQuestions = $picked->map(fn (Question $q) => [
+            'question' => $q->question,
+            'type' => $q->type->value,
+            'options' => $q->options ?? [],
+            'correct_answer' => $q->correct_answer,
+            'explanation' => '',
+            'difficulty' => $this->aiDifficulty,
+        ])->all();
+
+        if (count($this->pendingAiQuestions) > 0) {
+            $this->saveToHistory('bank');
+        }
+
+        unset($this->questions);
+
+        $this->dispatch('toast', variant: 'success', heading: 'Ready to add', text: count($this->pendingAiQuestions).' question(s) loaded from your question bank. Review below, then add to this exam.');
+    }
+
+    /**
+     * @return array<int, array{type: string, count: int}>
+     */
+    private function typeMixSpecifications(): array
+    {
+        $items = [];
+
+        if ($this->aiMixMultipleChoice && $this->aiCountMultipleChoice > 0) {
+            $items[] = ['type' => QuestionType::MultipleChoice->value, 'count' => $this->aiCountMultipleChoice];
+        }
+
+        if ($this->aiMixTrueFalse && $this->aiCountTrueFalse > 0) {
+            $items[] = ['type' => QuestionType::TrueFalse->value, 'count' => $this->aiCountTrueFalse];
+        }
+
+        if ($this->aiMixShortAnswer && $this->aiCountShortAnswer > 0) {
+            $items[] = ['type' => QuestionType::ShortAnswer->value, 'count' => $this->aiCountShortAnswer];
+        }
+
+        return $items;
+    }
+
+    private function validateAiMixCounts(): void
+    {
+        $rules = [
+            'aiCountMultipleChoice' => $this->aiMixMultipleChoice ? 'required|integer|min:1|max:10' : 'nullable|integer|min:0|max:10',
+            'aiCountTrueFalse' => $this->aiMixTrueFalse ? 'required|integer|min:1|max:10' : 'nullable|integer|min:0|max:10',
+            'aiCountShortAnswer' => $this->aiMixShortAnswer ? 'required|integer|min:1|max:10' : 'nullable|integer|min:0|max:10',
+        ];
+
+        $this->validate($rules);
+
+        if ($this->typeMixSpecifications() === []) {
+            throw ValidationException::withMessages([
+                'aiMix' => ['Select at least one question type and enter a count greater than zero.'],
+            ]);
+        }
+
+        $total = array_sum(array_column($this->typeMixSpecifications(), 'count'));
+
+        if ($total > 20) {
+            throw ValidationException::withMessages([
+                'aiMix' => ['Total questions cannot exceed 20 per generation.'],
+            ]);
+        }
+    }
+
+    private function assertBankHasEnoughQuestions(): void
+    {
+        $lines = [];
+
+        foreach ($this->typeMixSpecifications() as $spec) {
+            $available = Question::query()
+                ->whereHas('exam', fn ($q) => $q->where('user_id', auth()->id()))
+                ->where('exam_id', '!=', $this->exam->id)
+                ->where('type', $spec['type'])
+                ->count();
+
+            if ($available < $spec['count']) {
+                $label = QuestionType::from($spec['type'])->label();
+                $lines[] = "{$label}: {$available} available, {$spec['count']} requested.";
+            }
+        }
+
+        if ($lines !== []) {
+            throw ValidationException::withMessages([
+                'aiBank' => ['Not enough questions in your other exams: '.implode(' ', $lines)],
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $questions
+     * @return array<int, array<string, mixed>>
+     */
+    private function dedupeAiQuestionsByText(array $questions): array
+    {
+        $seen = [];
+        $out = [];
+
+        foreach ($questions as $q) {
+            $key = mb_strtolower(trim((string) ($q['question'] ?? '')));
+
+            if ($key === '' || isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $out[] = $q;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<int, array{type: string, enabled: bool, count: int}>
+     */
+    private function snapshotTypeMix(): array
+    {
+        return [
+            ['type' => QuestionType::MultipleChoice->value, 'enabled' => $this->aiMixMultipleChoice, 'count' => $this->aiCountMultipleChoice],
+            ['type' => QuestionType::TrueFalse->value, 'enabled' => $this->aiMixTrueFalse, 'count' => $this->aiCountTrueFalse],
+            ['type' => QuestionType::ShortAnswer->value, 'enabled' => $this->aiMixShortAnswer, 'count' => $this->aiCountShortAnswer],
+        ];
+    }
+
+    /**
+     * @param  array<int, array{type: string, enabled: bool, count: int}>  $snapshot
+     */
+    private function restoreTypeMixFromSnapshot(array $snapshot): void
+    {
+        foreach ($snapshot as $row) {
+            if ($row['type'] === QuestionType::MultipleChoice->value) {
+                $this->aiMixMultipleChoice = (bool) $row['enabled'];
+                $this->aiCountMultipleChoice = (int) $row['count'];
+            } elseif ($row['type'] === QuestionType::TrueFalse->value) {
+                $this->aiMixTrueFalse = (bool) $row['enabled'];
+                $this->aiCountTrueFalse = (int) $row['count'];
+            } elseif ($row['type'] === QuestionType::ShortAnswer->value) {
+                $this->aiMixShortAnswer = (bool) $row['enabled'];
+                $this->aiCountShortAnswer = (int) $row['count'];
+            }
+        }
+    }
+
+    /**
+     * @param  array<int, array{type: string, count: int}>  $specs
+     */
+    private function formatTypeMixLabel(array $specs): string
+    {
+        return collect($specs)
+            ->map(fn (array $s) => QuestionType::from($s['type'])->label().' × '.$s['count'])
+            ->implode(', ');
     }
 
     public function confirmAiQuestion(int $index): void
@@ -303,13 +451,13 @@ new #[Title('Manage Questions')] class extends Component {
             return;
         }
 
-        $type  = QuestionType::tryFrom($data['type'] ?? '') ?? QuestionType::ShortAnswer;
+        $resolved = Question::resolveFromAiPayload($data);
         $order = $this->exam->questions()->max('order') + 1;
 
         $this->exam->questions()->create([
             'question'       => $data['question'],
-            'type'           => $type->value,
-            'options'        => $type->hasOptions() && ! empty($data['options']) ? $data['options'] : null,
+            'type'           => $resolved['type']->value,
+            'options'        => $resolved['options'],
             'correct_answer' => $data['correct_answer'],
             'order'          => $order,
         ]);
@@ -323,12 +471,12 @@ new #[Title('Manage Questions')] class extends Component {
         $nextOrder = $this->exam->questions()->max('order') + 1;
 
         foreach ($this->pendingAiQuestions as $data) {
-            $type = QuestionType::tryFrom($data['type'] ?? '') ?? QuestionType::ShortAnswer;
+            $resolved = Question::resolveFromAiPayload($data);
 
             $this->exam->questions()->create([
                 'question'       => $data['question'],
-                'type'           => $type->value,
-                'options'        => $type->hasOptions() && ! empty($data['options']) ? $data['options'] : null,
+                'type'           => $resolved['type']->value,
+                'options'        => $resolved['options'],
                 'correct_answer' => $data['correct_answer'],
                 'order'          => $nextOrder++,
             ]);
@@ -353,8 +501,34 @@ new #[Title('Manage Questions')] class extends Component {
         }
 
         $this->pendingAiQuestions = $history[$index]['questions'];
-        $this->aiTopic            = $history[$index]['topic'];
-        $this->aiType             = $history[$index]['type'];
+        $this->aiTopic = $history[$index]['topic'] ?? '';
+
+        if (isset($history[$index]['type_specs']) && is_array($history[$index]['type_specs'])) {
+            $this->restoreTypeMixFromSnapshot($history[$index]['type_specs']);
+        } elseif (isset($history[$index]['type'])) {
+            $this->aiMixMultipleChoice = false;
+            $this->aiMixTrueFalse = false;
+            $this->aiMixShortAnswer = false;
+            $legacyType = $history[$index]['type'];
+            $legacyCount = (int) ($history[$index]['count'] ?? 1);
+
+            match ($legacyType) {
+                QuestionType::MultipleChoice->value => $this->aiMixMultipleChoice = true,
+                QuestionType::TrueFalse->value => $this->aiMixTrueFalse = true,
+                QuestionType::ShortAnswer->value => $this->aiMixShortAnswer = true,
+                default => $this->aiMixShortAnswer = true,
+            };
+
+            if ($this->aiMixMultipleChoice) {
+                $this->aiCountMultipleChoice = max(1, min(10, $legacyCount));
+            }
+            if ($this->aiMixTrueFalse) {
+                $this->aiCountTrueFalse = max(1, min(10, $legacyCount));
+            }
+            if ($this->aiMixShortAnswer) {
+                $this->aiCountShortAnswer = max(1, min(10, $legacyCount));
+            }
+        }
     }
 
     #[Computed]
@@ -375,6 +549,26 @@ new #[Title('Manage Questions')] class extends Component {
         return QuestionType::from($this->type)->hasOptions();
     }
 
+    #[Computed]
+    public function aiMixTotalRequested(): int
+    {
+        $total = 0;
+
+        if ($this->aiMixMultipleChoice) {
+            $total += max(0, $this->aiCountMultipleChoice);
+        }
+
+        if ($this->aiMixTrueFalse) {
+            $total += max(0, $this->aiCountTrueFalse);
+        }
+
+        if ($this->aiMixShortAnswer) {
+            $total += max(0, $this->aiCountShortAnswer);
+        }
+
+        return $total;
+    }
+
     /**
      * Last 5 generation batches for this exam, keyed in session.
      *
@@ -387,16 +581,19 @@ new #[Title('Manage Questions')] class extends Component {
     }
 
     /** Persist the latest batch to session history (max 5 entries per exam). */
-    private function saveToHistory(): void
+    private function saveToHistory(string $source = 'ai'): void
     {
-        $key     = "ai_gen_history_{$this->exam->id}";
+        $key = "ai_gen_history_{$this->exam->id}";
         $history = session($key, []);
+        $specs = $this->typeMixSpecifications();
 
         array_unshift($history, [
-            'topic'        => $this->aiTopic,
-            'type'         => $this->aiType,
-            'count'        => count($this->pendingAiQuestions),
-            'questions'    => $this->pendingAiQuestions,
+            'topic' => $source === 'bank' ? 'Question bank (random)' : $this->aiTopic,
+            'source' => $source,
+            'type_specs' => $this->snapshotTypeMix(),
+            'type_label' => $this->formatTypeMixLabel($specs),
+            'count' => count($this->pendingAiQuestions),
+            'questions' => $this->pendingAiQuestions,
             'generated_at' => now()->format('H:i'),
         ]);
 
@@ -449,10 +646,7 @@ new #[Title('Manage Questions')] class extends Component {
 
     {{-- ── AI Generation Panel ── --}}
     @if ($showAiPanel)
-        <div
-            class="bento-flat space-y-4"
-            x-data="{ generating: $wire.$entangle('aiGenerating') }"
-        >
+        <div class="bento-flat space-y-4">
             <div class="flex items-center gap-2">
                 <flux:icon.sparkles class="text-teal-600 size-5" />
                 <flux:heading size="lg">Generate Questions with AI</flux:heading>
@@ -473,23 +667,73 @@ new #[Title('Manage Questions')] class extends Component {
                     <flux:error name="aiTopic" />
                 </flux:field>
 
-                <flux:field>
-                    <flux:label>Question Type</flux:label>
-                    <flux:select wire:model="aiType">
-                        @foreach ($this->questionTypes as $qType)
-                            <flux:select.option :value="$qType->value">{{ $qType->label() }}</flux:select.option>
-                        @endforeach
-                    </flux:select>
+                <flux:field class="sm:col-span-2">
+                    <flux:label>Question mix</flux:label>
+                    <flux:description>Select types and how many of each (max 10 per type, 20 total). The same mix is used for AI generation and for random picks from your other exams.</flux:description>
+                    <flux:error name="aiMix" />
+                    <flux:error name="aiBank" />
+                    <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div class="flex flex-col gap-2 rounded-xl border border-zinc-200/80 bg-white/60 p-3 dark:border-zinc-700 dark:bg-zinc-900/40">
+                            <label class="flex cursor-pointer items-center gap-2 select-none">
+                                <input
+                                    type="checkbox"
+                                    wire:model.live="aiMixMultipleChoice"
+                                    class="rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
+                                />
+                                <span class="text-sm font-medium text-zinc-800 dark:text-zinc-100">Multiple Choice</span>
+                            </label>
+                            <flux:input
+                                wire:model="aiCountMultipleChoice"
+                                type="number"
+                                min="1"
+                                max="10"
+                                class="w-full"
+                                @disabled(! $aiMixMultipleChoice)
+                            />
+                            <flux:error name="aiCountMultipleChoice" />
+                        </div>
+                        <div class="flex flex-col gap-2 rounded-xl border border-zinc-200/80 bg-white/60 p-3 dark:border-zinc-700 dark:bg-zinc-900/40">
+                            <label class="flex cursor-pointer items-center gap-2 select-none">
+                                <input
+                                    type="checkbox"
+                                    wire:model.live="aiMixTrueFalse"
+                                    class="rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
+                                />
+                                <span class="text-sm font-medium text-zinc-800 dark:text-zinc-100">True / False</span>
+                            </label>
+                            <flux:input
+                                wire:model="aiCountTrueFalse"
+                                type="number"
+                                min="1"
+                                max="10"
+                                class="w-full"
+                                @disabled(! $aiMixTrueFalse)
+                            />
+                            <flux:error name="aiCountTrueFalse" />
+                        </div>
+                        <div class="flex flex-col gap-2 rounded-xl border border-zinc-200/80 bg-white/60 p-3 dark:border-zinc-700 dark:bg-zinc-900/40">
+                            <label class="flex cursor-pointer items-center gap-2 select-none">
+                                <input
+                                    type="checkbox"
+                                    wire:model.live="aiMixShortAnswer"
+                                    class="rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
+                                />
+                                <span class="text-sm font-medium text-zinc-800 dark:text-zinc-100">Short Answer</span>
+                            </label>
+                            <flux:input
+                                wire:model="aiCountShortAnswer"
+                                type="number"
+                                min="1"
+                                max="10"
+                                class="w-full"
+                                @disabled(! $aiMixShortAnswer)
+                            />
+                            <flux:error name="aiCountShortAnswer" />
+                        </div>
+                    </div>
                 </flux:field>
 
-                <flux:field>
-                    <flux:label>Number of Questions</flux:label>
-                    <flux:input wire:model="aiCount" type="number" min="1" max="10" />
-                    <flux:description>Up to 5 stream live · 6–10 run in background</flux:description>
-                    <flux:error name="aiCount" />
-                </flux:field>
-
-                <flux:field>
+                <flux:field class="sm:col-span-2">
                     <flux:label>Difficulty (1 = Easy · 5 = Expert)</flux:label>
                     <flux:select wire:model="aiDifficulty">
                         <flux:select.option value="1">1 — Very Easy</flux:select.option>
@@ -502,32 +746,49 @@ new #[Title('Manage Questions')] class extends Component {
                 </flux:field>
             </div>
 
-            <div class="flex items-center justify-between">
-                {{-- Generate button --}}
-                <flux:button
-                    variant="primary"
-                    x-on:click="generating = true; $wire.streamGenerateWithAi()"
-                    x-bind:disabled="generating"
-                    :loading="false"
-                >
-                    <span x-show="!generating" class="inline-flex items-center gap-1">
-                        <flux:icon.sparkles class="size-4" />
-                        Generate
-                    </span>
-                    <span x-show="generating" x-cloak class="inline-flex items-center gap-1">
-                        <svg class="animate-spin size-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
-                        Generating…
-                    </span>
-                </flux:button>
+            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                    <flux:button
+                        variant="primary"
+                        wire:click="streamGenerateWithAi"
+                        wire:loading.attr="disabled"
+                        wire:target="streamGenerateWithAi"
+                    >
+                        <span wire:loading.remove wire:target="streamGenerateWithAi" class="inline-flex items-center gap-1">
+                            <flux:icon.sparkles class="size-4" />
+                            Generate with AI
+                        </span>
+                        <span wire:loading wire:target="streamGenerateWithAi" class="inline-flex items-center gap-1">
+                            <svg class="animate-spin size-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                            Generating…
+                        </span>
+                    </flux:button>
 
-                <flux:text x-show="generating" x-cloak size="sm" class="text-charcoal-400 animate-pulse">
+                    <flux:button
+                        variant="ghost"
+                        icon="rectangle-stack"
+                        wire:click="importMixedRandomFromBank"
+                        wire:loading.attr="disabled"
+                        wire:target="importMixedRandomFromBank streamGenerateWithAi"
+                    >
+                        <span wire:loading.remove wire:target="importMixedRandomFromBank" class="inline-flex items-center gap-1">
+                            Random from question bank
+                        </span>
+                        <span wire:loading wire:target="importMixedRandomFromBank" class="inline-flex items-center gap-1">
+                            <svg class="animate-spin size-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                            Loading…
+                        </span>
+                    </flux:button>
+                </div>
+
+                <flux:text wire:loading wire:target="streamGenerateWithAi" size="sm" class="text-charcoal-400 animate-pulse">
                     Generating questions… please wait.
                 </flux:text>
             </div>
 
             {{-- Skeleton cards shown while generating --}}
-            <div x-show="generating" x-cloak class="space-y-3">
-                @for ($s = 0; $s < max(min($aiCount, 3), 1); $s++)
+            <div wire:loading wire:target="streamGenerateWithAi" class="space-y-3">
+                @for ($s = 0; $s < max(min($this->aiMixTotalRequested, 3), 1); $s++)
                     <div class="bento-flat animate-pulse space-y-3 border-teal-100 bg-teal-50/40">
                         <div class="h-4 bg-teal-100 rounded w-3/4"></div>
                         <div class="flex gap-2">
@@ -553,7 +814,7 @@ new #[Title('Manage Questions')] class extends Component {
                             <flux:text size="sm">
                                 <strong>{{ $batch['topic'] }}</strong>
                                 · {{ $batch['count'] }} question(s)
-                                · {{ QuestionType::from($batch['type'])->label() }}
+                                · {{ $batch['type_label'] ?? (isset($batch['type']) ? QuestionType::from($batch['type'])->label() : 'Mixed') }}
                             </flux:text>
                         </div>
                         <flux:button size="sm" variant="ghost" wire:click="loadFromHistory({{ $hi }})">
@@ -596,7 +857,7 @@ new #[Title('Manage Questions')] class extends Component {
 
                     <div class="flex items-center gap-2 flex-wrap">
                         <flux:badge size="sm" color="blue">
-                            {{ QuestionType::tryFrom($pq['type'] ?? '')?->label() ?? $pq['type'] }}
+                            {{ QuestionType::tryFromAi($pq['type'] ?? '')?->label() ?? $pq['type'] }}
                         </flux:badge>
                         <flux:badge size="sm" color="zinc">Difficulty: {{ $pq['difficulty'] ?? '?' }}</flux:badge>
                         <flux:text size="sm" class="text-zinc-500">Correct: {{ $pq['correct_answer'] }}</flux:text>

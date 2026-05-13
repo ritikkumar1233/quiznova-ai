@@ -28,8 +28,10 @@ it('streamGenerateWithAi populates pendingAiQuestions from faked response', func
     $component = Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'World Capitals')
-        ->set('aiType', QuestionType::MultipleChoice->value)
-        ->set('aiCount', 1)
+        ->set('aiMixMultipleChoice', true)
+        ->set('aiCountMultipleChoice', 1)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', false)
         ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi');
 
@@ -53,7 +55,11 @@ it('streamGenerateWithAi sets aiGenerating to false after completion', function 
     $component = Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'Science')
-        ->set('aiCount', 1)
+        ->set('aiMixMultipleChoice', true)
+        ->set('aiCountMultipleChoice', 1)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', false)
+        ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi');
 
     expect($component->get('aiGenerating'))->toBeFalse();
@@ -76,7 +82,11 @@ it('streamGenerateWithAi parses multiple questions', function () {
     $component = Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'History')
-        ->set('aiCount', 3)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 3)
+        ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi');
 
     expect($component->get('pendingAiQuestions'))->toHaveCount(3);
@@ -97,8 +107,11 @@ it('generation history is stored in session after successful generation', functi
     Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'PHP Basics')
-        ->set('aiType', QuestionType::ShortAnswer->value)
-        ->set('aiCount', 1)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 1)
+        ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi');
 
     $history = session("ai_gen_history_{$exam->id}", []);
@@ -150,7 +163,11 @@ it('session history is capped at 5 entries', function () {
     Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'New Topic')
-        ->set('aiCount', 1)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 1)
+        ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi');
 
     $history = session("ai_gen_history_{$exam->id}", []);
@@ -175,7 +192,11 @@ it('streamGenerateWithAi clears aiError on success', function () {
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiError', 'Previous error')
         ->set('aiTopic', 'Chemistry')
-        ->set('aiCount', 1)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 1)
+        ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi');
 
     expect($component->get('aiError'))->toBe('');

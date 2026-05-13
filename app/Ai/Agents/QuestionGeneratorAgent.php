@@ -55,6 +55,7 @@ class QuestionGeneratorAgent implements Agent, HasStructuredOutput
 
         Rules:
         - Each question must be clear, unambiguous, and test genuine understanding.
+        - For EVERY question object, the "type" field MUST be exactly one of these three strings (no spaces, no labels): "multiple_choice", "true_false", or "short_answer". Use "true_false" for True/False items — never use "short_answer" for them.
         - The correct_answer must match one of the options exactly (case-sensitive) for multiple choice and true/false.
         - Never embed the correct answer in the question text itself.
         - The explanation should clarify why the correct answer is right.

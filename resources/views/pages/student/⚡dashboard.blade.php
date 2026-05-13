@@ -66,6 +66,7 @@ new #[Title('Available Exams')] class extends Component {
     {
         return auth()->user()->attempts()
             ->completed()
+            ->whereHas('exam')
             ->with('exam:id,title')
             ->orderBy('completed_at')
             ->get()
@@ -175,7 +176,7 @@ new #[Title('Available Exams')] class extends Component {
                     <flux:table.rows>
                         @foreach ($this->myAttempts as $attempt)
                             <flux:table.row :key="$attempt->id">
-                                <flux:table.cell variant="strong">{{ $attempt->exam->title }}</flux:table.cell>
+                                <flux:table.cell variant="strong">{{ $attempt->exam?->title ?? 'Exam no longer available' }}</flux:table.cell>
                                 <flux:table.cell>
                                     {{ $attempt->score !== null ? $attempt->score.'%' : '—' }}
                                 </flux:table.cell>
@@ -197,7 +198,7 @@ new #[Title('Available Exams')] class extends Component {
                                         >
                                             View Results
                                         </flux:button>
-                                    @else
+                                    @elseif ($attempt->exam)
                                         <flux:button
                                             size="sm"
                                             variant="ghost"
@@ -206,6 +207,8 @@ new #[Title('Available Exams')] class extends Component {
                                         >
                                             Continue
                                         </flux:button>
+                                    @else
+                                        <flux:text size="sm" class="text-zinc-500">Unavailable</flux:text>
                                     @endif
                                 </flux:table.cell>
                             </flux:table.row>

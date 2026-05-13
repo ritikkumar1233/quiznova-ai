@@ -21,8 +21,10 @@ it('shows a clear error when no AI providers are configured', function () {
     Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'Math')
-        ->set('aiType', QuestionType::ShortAnswer->value)
-        ->set('aiCount', 2)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 2)
         ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi')
         ->assertSet('aiError', 'No AI providers are configured. Add a provider API key or set OLLAMA_BASE_URL to use Ollama.')
@@ -47,8 +49,10 @@ it('discards a single pending AI question by index', function () {
     Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'Math')
-        ->set('aiType', QuestionType::ShortAnswer->value)
-        ->set('aiCount', 2)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 2)
         ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi')
         ->assertCount('pendingAiQuestions', 2)
@@ -75,8 +79,10 @@ it('discarding reindexes the pending array', function () {
     $component = Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'Science')
-        ->set('aiType', QuestionType::ShortAnswer->value)
-        ->set('aiCount', 3)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 3)
         ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi')
         ->call('discardAiQuestion', 0);
@@ -104,8 +110,10 @@ it('saves generation results to session history', function () {
     Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'History')
-        ->set('aiType', QuestionType::ShortAnswer->value)
-        ->set('aiCount', 1)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 1)
         ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi');
 
@@ -136,7 +144,10 @@ it('loads questions from session history', function () {
         ->call('loadFromHistory', 0)
         ->assertCount('pendingAiQuestions', 1)
         ->assertSet('aiTopic', 'Geography')
-        ->assertSet('aiType', QuestionType::MultipleChoice->value);
+        ->assertSet('aiMixMultipleChoice', true)
+        ->assertSet('aiMixTrueFalse', false)
+        ->assertSet('aiMixShortAnswer', false)
+        ->assertSet('aiCountMultipleChoice', 1);
 });
 
 it('loadFromHistory ignores invalid index', function () {
@@ -165,8 +176,10 @@ it('session history is capped at 5 entries', function () {
     for ($i = 0; $i < 6; $i++) {
         $component
             ->set('aiTopic', "Topic {$i}")
-            ->set('aiType', QuestionType::ShortAnswer->value)
-            ->set('aiCount', 1)
+            ->set('aiMixMultipleChoice', false)
+            ->set('aiMixTrueFalse', false)
+            ->set('aiMixShortAnswer', true)
+            ->set('aiCountShortAnswer', 1)
             ->set('aiDifficulty', 1)
             ->call('streamGenerateWithAi');
     }

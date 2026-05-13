@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Enums\QuestionType;
 use App\Models\Exam;
+use App\Models\Question;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -34,12 +34,12 @@ class ProcessGeneratedQuestionsJob implements ShouldQueue
                 continue;
             }
 
-            $type = QuestionType::tryFrom($data['type'] ?? '') ?? QuestionType::ShortAnswer;
+            $resolved = Question::resolveFromAiPayload($data);
 
             $exam->questions()->create([
                 'question' => $data['question'],
-                'type' => $type->value,
-                'options' => $type->hasOptions() && ! empty($data['options']) ? $data['options'] : null,
+                'type' => $resolved['type']->value,
+                'options' => $resolved['options'],
                 'correct_answer' => $data['correct_answer'],
                 'order' => $nextOrder++,
             ]);

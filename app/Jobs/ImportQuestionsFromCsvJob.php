@@ -69,11 +69,16 @@ class ImportQuestionsFromCsvJob implements ShouldQueue
                 continue;
             }
 
-            $type = QuestionType::tryFrom($typeRaw) ?? QuestionType::ShortAnswer;
+            $type = QuestionType::tryFromAi($typeRaw) ?? QuestionType::ShortAnswer;
 
             $options = null;
-            if ($type->hasOptions() && ! empty($data['options'])) {
-                $options = array_values(array_filter(array_map('trim', explode('|', $data['options']))));
+
+            if ($type->hasOptions()) {
+                if ($type === QuestionType::TrueFalse) {
+                    $options = ['True', 'False'];
+                } elseif (! empty($data['options'])) {
+                    $options = array_values(array_filter(array_map('trim', explode('|', $data['options']))));
+                }
             }
 
             $exam->questions()->create([

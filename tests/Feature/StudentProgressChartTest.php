@@ -81,3 +81,30 @@ it('progress chart data only includes own attempts', function () {
         ->test('pages::student.dashboard')
         ->assertSet('progressChartData', []);
 });
+
+it('progress chart omits attempts whose exam was soft-deleted', function () {
+    $student = User::factory()->student()->create();
+    $exam = Exam::factory()->published()->create();
+
+    Attempt::factory()->completed()->for($exam)->for($student, 'student')->create(['score' => 72]);
+    $exam->delete();
+
+    $data = Livewire::actingAs($student)
+        ->test('pages::student.dashboard')
+        ->instance()
+        ->progressChartData;
+
+    expect($data)->toBeEmpty();
+});
+
+it('student dashboard loads when a recent attempt references a soft-deleted exam', function () {
+    $student = User::factory()->student()->create();
+    $exam = Exam::factory()->published()->create();
+
+    Attempt::factory()->completed()->for($exam)->for($student, 'student')->create(['score' => 55]);
+    $exam->delete();
+
+    Livewire::actingAs($student)
+        ->test('pages::student.dashboard')
+        ->assertCount('myAttempts', 1);
+});

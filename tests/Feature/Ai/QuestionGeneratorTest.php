@@ -29,8 +29,10 @@ it('generates questions synchronously for 5 or fewer and stores as pending', fun
     Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'Basic Math')
-        ->set('aiType', QuestionType::MultipleChoice->value)
-        ->set('aiCount', 1)
+        ->set('aiMixMultipleChoice', true)
+        ->set('aiCountMultipleChoice', 1)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', false)
         ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi')
         ->assertSet('aiError', '')
@@ -38,22 +40,37 @@ it('generates questions synchronously for 5 or fewer and stores as pending', fun
         ->assertCount('pendingAiQuestions', 1);
 });
 
-it('queues generation and does not add pending questions when count exceeds 5', function () {
+it('generates six short-answer questions synchronously when requested', function () {
     $teacher = User::factory()->teacher()->create();
     $exam = Exam::factory()->published()->for($teacher)->create();
 
-    QuestionGeneratorAgent::fake();
+    $questions = [];
+
+    for ($i = 1; $i <= 6; $i++) {
+        $questions[] = [
+            'question' => "Science short {$i}?",
+            'type' => QuestionType::ShortAnswer->value,
+            'options' => [],
+            'correct_answer' => "A{$i}",
+            'explanation' => 'x',
+            'difficulty' => 2,
+        ];
+    }
+
+    QuestionGeneratorAgent::fake([
+        ['questions' => $questions],
+    ]);
 
     Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'Science')
-        ->set('aiType', QuestionType::ShortAnswer->value)
-        ->set('aiCount', 6)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 6)
         ->set('aiDifficulty', 2)
-        ->call('generateWithAi')
-        ->assertCount('pendingAiQuestions', 0);
-
-    QuestionGeneratorAgent::assertQueued(fn ($prompt) => str_contains($prompt->prompt, 'Science'));
+        ->call('streamGenerateWithAi')
+        ->assertCount('pendingAiQuestions', 6);
 });
 
 it('can confirm a single pending ai question to save it to the exam', function () {
@@ -78,8 +95,10 @@ it('can confirm a single pending ai question to save it to the exam', function (
     Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'Laravel')
-        ->set('aiType', QuestionType::ShortAnswer->value)
-        ->set('aiCount', 1)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 1)
         ->set('aiDifficulty', 2)
         ->call('streamGenerateWithAi')
         ->call('confirmAiQuestion', 0)
@@ -104,8 +123,10 @@ it('can confirm all pending ai questions at once', function () {
     Livewire::actingAs($teacher)
         ->test('pages::teacher.exams.questions', ['exam' => $exam])
         ->set('aiTopic', 'History')
-        ->set('aiType', QuestionType::ShortAnswer->value)
-        ->set('aiCount', 2)
+        ->set('aiMixMultipleChoice', false)
+        ->set('aiMixTrueFalse', false)
+        ->set('aiMixShortAnswer', true)
+        ->set('aiCountShortAnswer', 2)
         ->set('aiDifficulty', 1)
         ->call('streamGenerateWithAi')
         ->call('confirmAllAiQuestions')

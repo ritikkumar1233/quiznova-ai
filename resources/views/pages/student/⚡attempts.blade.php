@@ -85,7 +85,7 @@ new #[Title('My Attempts')] class extends Component {
         <flux:table.rows>
             @forelse ($this->attempts as $attempt)
                 <flux:table.row :key="$attempt->id">
-                    <flux:table.cell variant="strong">{{ $attempt->exam->title }}</flux:table.cell>
+                    <flux:table.cell variant="strong">{{ $attempt->exam?->title ?? 'Exam no longer available' }}</flux:table.cell>
                     <flux:table.cell>
                         <span class="{{ $attempt->score >= 70 ? 'score-pass' : ($attempt->score >= 50 ? 'score-warn' : 'score-fail') }} font-bold">
                             {{ $attempt->score }}%
