@@ -49,7 +49,25 @@ it('student can visit a published exam', function () {
         ->assertOk();
 });
 
+<<<<<<< HEAD
 it('take exam uses isolated exam layout without global chat chrome', function () {
+=======
+it('take exam page guards against enter key implicit form submit', function () {
+    $student = User::factory()->student()->create();
+    $teacher = User::factory()->teacher()->create();
+    $exam = Exam::factory()->published()->for($teacher)->has(Question::factory(), 'questions')->create();
+
+    $html = $this->actingAs($student)
+        ->get(route('student.exams.take', $exam))
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('suppressExamEnterSubmit')
+        ->and($html)->toContain('keydown.enter.capture');
+});
+
+it('exam page uses isolated layout without dashboard navigation', function () {
+>>>>>>> change
     $student = User::factory()->student()->create();
     $teacher = User::factory()->teacher()->create();
     $exam = Exam::factory()->published()->for($teacher)->has(Question::factory(), 'questions')->create();
@@ -60,7 +78,12 @@ it('take exam uses isolated exam layout without global chat chrome', function ()
         ->getContent();
 
     expect($html)->toContain('exam-layout')
+<<<<<<< HEAD
         ->and($html)->not->toContain('AI Chat Assistant');
+=======
+        ->and($html)->not->toContain('My Attempts')
+        ->and($html)->not->toContain('Available Exams');
+>>>>>>> change
 });
 
 it('creates attempt when student visits exam', function () {
