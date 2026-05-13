@@ -40,4 +40,4 @@ RUN php artisan view:cache || true
 EXPOSE 10000
 
 # Start app
-CMD php artisan migrate --force && php artisan storage:link || true && php artisan optimize && php artisan serve --host=0.0.0.0 --port=10000
+CMD php artisan config:clear && php artisan cache:clear && php artisan migrate:fresh --force && php artisan storage:link || true && php artisan optimize && php artisan serve --host=0.0.0.0 --port=10000
