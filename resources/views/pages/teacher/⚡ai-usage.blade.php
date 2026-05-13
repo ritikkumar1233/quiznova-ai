@@ -59,12 +59,6 @@ new #[Title('AI Usage')] class extends Component {
             ->where('created_at', '>=', now()->subDays(7)->startOfDay())
             ->sum('estimated_cost');
     }
-
-    #[Computed]
-    public function budgetExceeded(): bool
-    {
-        return \Illuminate\Support\Facades\Cache::has('ai_budget_exceeded:'.auth()->id());
-    }
 }; ?>
 
 <div class="flex flex-col gap-6">
@@ -73,12 +67,7 @@ new #[Title('AI Usage')] class extends Component {
         <flux:heading size="xl">AI Usage</flux:heading>
     </div>
 
-    @if ($this->budgetExceeded)
-        <flux:callout variant="danger" icon="exclamation-triangle">
-            <flux:callout.heading>Daily budget exceeded</flux:callout.heading>
-            <flux:callout.text>AI features are paused until tomorrow. Your daily limit is ${{ number_format(config('ai.rate_limit.daily_budget', 5.00), 2) }}.</flux:callout.text>
-        </flux:callout>
-    @endif
+    {{-- Budget enforcement disabled for demo mode --}}
 
     {{-- Summary stats --}}
     <div class="grid grid-cols-3 gap-4">

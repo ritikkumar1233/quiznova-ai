@@ -9,7 +9,6 @@ use App\Jobs\GenerateAttemptEmbeddingJob;
 use App\Models\Attempt;
 use App\Models\Exam;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -154,12 +153,7 @@ new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
 
     public function streamHint(int $questionId): void
     {
-        if (Cache::has('ai_budget_exceeded:'.auth()->id()) ||
-            ! RateLimiter::attempt('ai:'.auth()->id(), config('ai.rate_limit.per_minute', 30), fn () => true)) {
-            $this->hints[$questionId] = 'AI is temporarily unavailable. Please try again later.';
-
-            return;
-        }
+    // No global daily budget or rate limit enforced for hints in demo mode.
 
         $question = $this->exam->questions->firstWhere('id', $questionId);
 

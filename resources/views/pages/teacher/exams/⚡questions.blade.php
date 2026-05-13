@@ -8,7 +8,6 @@ use App\Jobs\ProcessGeneratedQuestionsJob;
 use App\Models\Exam;
 use App\Models\Question;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
@@ -194,17 +193,7 @@ new #[Title('Manage Questions')] class extends Component {
             return;
         }
 
-        if (Cache::has('ai_budget_exceeded:'.auth()->id())) {
-            $this->aiError = 'Daily AI budget exceeded. Please try again tomorrow.';
-
-            return;
-        }
-
-        if (! RateLimiter::attempt('ai:'.auth()->id(), config('ai.rate_limit.per_minute', 30), fn () => true)) {
-            $this->aiError = 'Too many AI requests. Please wait a moment.';
-
-            return;
-        }
+    // No daily budget or rate limit enforced for demo mode.
 
         $this->validateOnly('aiTopic');
         $this->validateOnly('aiCount');
@@ -264,17 +253,7 @@ new #[Title('Manage Questions')] class extends Component {
             return;
         }
 
-        if (Cache::has('ai_budget_exceeded:'.auth()->id())) {
-            $this->aiError = 'Daily AI budget exceeded. Please try again tomorrow.';
-
-            return;
-        }
-
-        if (! RateLimiter::attempt('ai:'.auth()->id(), config('ai.rate_limit.per_minute', 30), fn () => true)) {
-            $this->aiError = 'Too many AI requests. Please wait a moment.';
-
-            return;
-        }
+    // No daily budget or rate limit enforced for demo mode.
 
         $this->validateOnly('aiTopic');
         $this->validateOnly('aiCount');
