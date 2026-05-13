@@ -3,78 +3,62 @@
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen antialiased" style="background-color:#F8F9FA; font-family:'Lexend',sans-serif;">
+    <body class="min-h-screen antialiased" style="font-family:'Inter',ui-sans-serif,system-ui,sans-serif;">
 
-        <div style="display:flex; min-height:100vh;">
+        <div class="flex min-h-screen">
 
-            {{-- ── Left: Teal brand panel (desktop only) ── --}}
-            <div class="hidden lg:flex" style="width:420px; flex-shrink:0; flex-direction:column; justify-content:space-between; background:linear-gradient(160deg, #0D9488 0%, #0F766E 100%); padding:3rem; color:white;">
+            {{-- Brand story + AI visual (desktop) --}}
+            <div class="relative hidden w-[min(28rem,42vw)] shrink-0 flex-col justify-between overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-900 px-10 py-12 text-white lg:flex">
+                <div class="pointer-events-none absolute -left-24 top-1/4 size-80 rounded-full bg-cyan-500/20 blur-3xl"></div>
+                <div class="pointer-events-none absolute -right-16 bottom-0 size-72 rounded-full bg-violet-500/25 blur-3xl"></div>
 
-                {{-- Logo --}}
-                <a href="{{ route('home') }}" class="flex items-center gap-3" wire:navigate>
-                    <x-app-logo-icon class="size-10" />
-                    <span style="font-size:1.25rem; font-weight:700; letter-spacing:-0.02em;">
-                        {{ config('app.name') }}
-                    </span>
+                <a href="{{ route('home') }}" class="relative z-10 flex items-center gap-3" wire:navigate>
+                    <x-app-logo-icon class="size-11" />
+                    <span class="text-xl font-bold tracking-tight">{{ config('app.name') }}</span>
                 </a>
 
-                {{-- Callout --}}
-                <div style="display:flex; flex-direction:column; gap:2rem;">
-                    <blockquote style="display:flex; flex-direction:column; gap:0.75rem;">
-                        <p style="font-size:1.5rem; font-weight:700; line-height:1.35; letter-spacing:-0.02em; color:white;">
-                            "Testing yourself is the single most effective study strategy known to science."
+                <div class="relative z-10 flex flex-col gap-10">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/90">Production-grade</p>
+                        <h1 class="mt-3 text-3xl font-bold leading-tight tracking-tight">
+                            Learn faster with an AI tutor at your side.
+                        </h1>
+                        <p class="mt-4 max-w-sm text-sm leading-relaxed text-indigo-100/85">
+                            {{ config('app.name') }} blends secure assessments, adaptive practice, and real-time AI support—built for serious educators and ambitious students.
                         </p>
-                        <footer style="font-size:0.8125rem; color:rgba(255,255,255,.6);">
-                            — Roediger & Butler, 2011
-                        </footer>
-                    </blockquote>
+                    </div>
 
-                    <ul style="display:flex; flex-direction:column; gap:1rem; list-style:none; padding:0; margin:0;">
-                        <li style="display:flex; align-items:flex-start; gap:0.875rem;">
-                            <div style="margin-top:2px; width:2rem; height:2rem; background:rgba(255,255,255,.15); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                <svg style="width:15px;height:15px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+                    <div class="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
+                        <div class="flex items-center gap-3">
+                            <div class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-lg font-bold text-slate-950">
+                                AI
                             </div>
                             <div>
-                                <p style="font-size:.875rem; font-weight:600; margin-bottom:.125rem;">Multiple question types</p>
-                                <p style="font-size:.8125rem; color:rgba(255,255,255,.65); line-height:1.5;">Multiple choice, true/false, and short answer.</p>
+                                <p class="text-sm font-semibold">Guided explanations</p>
+                                <p class="text-xs text-indigo-200/80">Ask the tutor after every attempt—never during a live exam.</p>
                             </div>
-                        </li>
-                        <li style="display:flex; align-items:flex-start; gap:0.875rem;">
-                            <div style="margin-top:2px; width:2rem; height:2rem; background:rgba(255,255,255,.15); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                <svg style="width:15px;height:15px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            </div>
-                            <div>
-                                <p style="font-size:.875rem; font-weight:600; margin-bottom:.125rem;">Instant auto-grading</p>
-                                <p style="font-size:.8125rem; color:rgba(255,255,255,.65); line-height:1.5;">Scores and per-question feedback immediately.</p>
-                            </div>
-                        </li>
-                        <li style="display:flex; align-items:flex-start; gap:0.875rem;">
-                            <div style="margin-top:2px; width:2rem; height:2rem; background:rgba(255,255,255,.15); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                <svg style="width:15px;height:15px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            </div>
-                            <div>
-                                <p style="font-size:.875rem; font-weight:600; margin-bottom:.125rem;">Optional time limits</p>
-                                <p style="font-size:.8125rem; color:rgba(255,255,255,.65); line-height:1.5;">Simulate real exam conditions for any subject.</p>
-                            </div>
-                        </li>
-                    </ul>
+                        </div>
+                    </div>
                 </div>
 
-                <p style="font-size:.75rem; color:rgba(255,255,255,.45);">
-                    © {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
+                <p class="relative z-10 text-xs text-indigo-300/60">
+                    © {{ date('Y') }} {{ config('app.name') }}
                 </p>
             </div>
 
-            {{-- ── Right: form panel ── --}}
-            <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem 1.5rem;">
-                {{-- Mobile logo --}}
-                <a href="{{ route('home') }}" class="mb-8 flex items-center gap-2 lg:hidden" wire:navigate>
-                    <x-app-logo-icon class="size-8" />
-                    <span style="font-size:1.125rem; font-weight:700; color:#1F2937;">{{ config('app.name') }}</span>
+            {{-- Form column --}}
+            <div class="relative flex flex-1 flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 px-4 py-10 sm:px-8">
+                <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(99,102,241,0.12),transparent)]"></div>
+
+                <a href="{{ route('home') }}" class="relative z-10 mb-8 flex items-center gap-2 lg:hidden" wire:navigate>
+                    <x-app-logo-icon class="size-9" />
+                    <span class="text-lg font-bold text-slate-900">{{ config('app.name') }}</span>
                 </a>
 
-                <div style="width:100%; max-width:22rem;">
-                    {{ $slot }}
+                <div class="relative z-10 w-full max-w-md">
+                    <x-nova.glass-panel>
+                        {{ $slot }}
+                    </x-nova.glass-panel>
                 </div>
             </div>
         </div>

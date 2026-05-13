@@ -281,6 +281,4 @@ new #[Title('Exam Results')] class extends Component {
         </flux:button>
     </div>
     </div>
-
-    <livewire:student-chat />
 </div>

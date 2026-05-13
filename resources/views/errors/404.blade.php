@@ -1,4 +1,4 @@
-@extends('errors.layout', ['color' => '#0D9488'])
+@extends('errors.layout', ['color' => '#4F46E5'])
 
 @section('code', '404')
 @section('title', 'Page Not Found')

@@ -12,11 +12,12 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('Take Exam')] class extends Component {
+new #[Layout('layouts.exam')] #[Title('Take Exam')] class extends Component {
     public Exam $exam;
     public ?Attempt $attempt = null;
 
@@ -742,11 +743,11 @@ new #[Title('Take Exam')] class extends Component {
             @php $isFlagged = $answers[$question->id]['flagged'] ?? false; @endphp
             <div
                 class="bento-flat space-y-4 transition-colors duration-150"
-                style="{{ $isFlagged ? 'border-color: #5EEAD4; background-color: #F0FDFA;' : '' }}"
+                style="{{ $isFlagged ? 'border-color: #a5b4fc; background-color: #eef2ff;' : '' }}"
                 wire:key="q-{{ $question->id }}"
             >
                 <div style="display:flex; align-items:flex-start; gap:.75rem;">
-                    <span style="display:inline-flex; align-items:center; justify-content:center; min-width:1.75rem; height:1.75rem; border-radius:8px; background:#F0FDFA; color:#0F766E; font-size:.75rem; font-weight:700; flex-shrink:0; margin-top:1px;">
+                    <span style="display:inline-flex; align-items:center; justify-content:center; min-width:1.75rem; height:1.75rem; border-radius:8px; background:#eef2ff; color:#4338ca; font-size:.75rem; font-weight:700; flex-shrink:0; margin-top:1px;">
                         {{ $loop->index + 1 }}
                     </span>
                     <flux:heading style="flex:1; padding-top:2px;">{{ $question->question }}</flux:heading>

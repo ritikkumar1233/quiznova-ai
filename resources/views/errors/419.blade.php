@@ -5,7 +5,7 @@
 @section('message', 'Your session has expired. Please refresh the page and try again.')
 
 @section('extra-action')
-    <a href="javascript:location.reload();" style="font-size:0.875rem; font-weight:500; color:#0D9488; text-decoration:none;"
+    <a href="javascript:location.reload();" style="font-size:0.875rem; font-weight:500; color:#4F46E5; text-decoration:none;"
        onmouseover="this.style.textDecoration='underline';"
        onmouseout="this.style.textDecoration='none';">
         Refresh page

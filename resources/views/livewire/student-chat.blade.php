@@ -1,46 +1,103 @@
 <div>
     @unless($fullPage)
-    <div x-data="{ open: false }" x-on:open-chat.window="open = true" class="fixed right-4 bottom-4 z-50">
-        <div class="flex flex-col items-end gap-2">
-            <button x-on:click="open = !open" class="bento-flat p-3 rounded-full shadow-lg bg-gradient-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white transition">
-                <svg xmlns="http://www.w3.org/2000/svg" class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <div
+        x-data="{ open: false }"
+        x-on:open-chat.window="open = true"
+        class="pointer-events-none fixed bottom-4 right-4 z-[100] flex flex-col items-end gap-3 sm:bottom-6 sm:right-6"
+    >
+        <div class="pointer-events-auto flex flex-col items-end gap-3">
+            <button
+                type="button"
+                x-on:click="open = !open"
+                class="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500 text-white shadow-xl shadow-indigo-600/35 ring-2 ring-white/50 transition hover:scale-105 hover:shadow-indigo-600/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2"
+                aria-label="Toggle AI tutor"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="size-7" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.707 9.707 0 01-4-.86L3 20l1.14-4.08A7.953 7.953 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
             </button>
 
-            <div x-show="open" x-transition class="w-96 bg-white rounded-lg shadow-xl overflow-hidden border border-gray-200">
-                <div class="p-4 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-blue-50 flex items-center justify-between">
-                    <div class="font-semibold text-gray-800">AI Chat Assistant</div>
-                    <div class="flex items-center gap-3">
-                        <button wire:click="startNewChat" class="text-sm font-medium text-teal-600 hover:text-teal-700 transition">New</button>
-                        <button x-on:click="open = false" class="text-sm text-gray-400 hover:text-gray-600 transition">✕</button>
+            <div
+                x-show="open"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 translate-y-3 scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                x-transition:leave-end="opacity-0 translate-y-2 scale-95"
+                x-cloak
+                class="w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl shadow-indigo-950/20 ring-1 ring-slate-900/5 backdrop-blur-xl"
+                role="dialog"
+                aria-label="AI Chat Assistant"
+            >
+                <div class="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-indigo-50 via-violet-50 to-cyan-50 px-4 py-3.5">
+                    <div>
+                        <div class="text-sm font-bold text-slate-900">AI Chat Assistant</div>
+                        <div class="text-xs text-slate-500">{{ config('app.name') }}</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" wire:click="startNewChat" class="rounded-lg px-2 py-1 text-xs font-semibold text-indigo-600 transition hover:bg-white/80">New</button>
+                        <button type="button" x-on:click="open = false" class="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/80 hover:text-slate-700">✕</button>
                     </div>
                 </div>
 
-                <div class="p-4 h-60 overflow-y-auto bg-gray-50" id="chat-messages">
-                    @if($chatError)
-                        <div class="mb-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">
-                            ⚠️ {{ $chatError }}
-                        </div>
-                    @endif
-                    @if($session)
-                        @foreach($session->messages as $m)
-                            <div class="mb-3">
-                                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider">{{ ucfirst($m->role) }}</div>
-                                <div class="p-3 rounded-lg mt-1 text-sm leading-relaxed" style="background:{{ $m->role === 'assistant' ? '#EBF8F5' : '#E0F2FE' }}; color: {{ $m->role === 'assistant' ? '#0F766E' : '#0C4A6E' }}">{!! nl2br(e($m->content)) !!}</div>
+                <div class="relative h-60 bg-slate-50/80 p-4">
+                    <div
+                        wire:loading.delay
+                        wire:target="sendMessage,handleOpenChat"
+                        class="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-slate-50/90 backdrop-blur-[2px]"
+                    >
+                        <span class="relative flex size-3">
+                            <span class="absolute inline-flex size-full animate-ping rounded-full bg-indigo-400 opacity-40"></span>
+                            <span class="relative inline-flex size-3 rounded-full bg-indigo-600"></span>
+                        </span>
+                        <span class="text-sm font-medium text-indigo-800">Thinking…</span>
+                    </div>
+
+                    <div class="h-full overflow-y-auto pr-1" id="chat-messages">
+                        @if($chatError)
+                            <div class="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+                                ⚠️ {{ $chatError }}
                             </div>
-                        @endforeach
-                    @else
-                        <div class="text-sm text-gray-500 italic">Start a chat or click Explain on any question.</div>
-                    @endif
+                        @endif
+                        @if($session)
+                            @foreach($session->messages as $m)
+                                <div class="mb-3 animate-fadeIn">
+                                    <div class="text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">{{ ucfirst($m->role) }}</div>
+                                    <div
+                                        class="mt-1 rounded-xl px-3 py-2.5 text-sm leading-relaxed"
+                                        style="background:{{ $m->role === 'assistant' ? '#EEF2FF' : '#ECFEFF' }}; color: {{ $m->role === 'assistant' ? '#3730A3' : '#0E7490' }}"
+                                    >{!! nl2br(e($m->content)) !!}</div>
+                                </div>
+                            @endforeach
+                        @else
+                            <div class="text-sm italic text-slate-500">Start a chat or tap <strong>Explain</strong> on any results question.</div>
+                        @endif
+                    </div>
                 </div>
 
-                <div class="p-4 border-t border-gray-200 bg-white">
+                <div class="border-t border-slate-100 bg-white p-4">
                     <div class="flex gap-2">
-                        <input wire:model.defer="newMessage" type="text" placeholder="Ask something..." class="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                        <button wire:click="sendMessage" wire:loading.attr="disabled" wire:target="sendMessage" class="btn btn-primary bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white font-medium px-4 py-2 rounded-lg transition disabled:opacity-50">
-                            <span wire:loading.remove>Send</span>
-                            <span wire:loading>⏳</span>
+                        <input
+                            wire:model.defer="newMessage"
+                            type="text"
+                            placeholder="Ask something…"
+                            class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        />
+                        <button
+                            type="button"
+                            wire:click="sendMessage"
+                            wire:loading.attr="disabled"
+                            wire:target="sendMessage"
+                            class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-600/25 transition hover:brightness-105 disabled:opacity-50"
+                        >
+                            <span wire:loading.remove wire:target="sendMessage">Send</span>
+                            <span wire:loading wire:target="sendMessage" class="inline-flex items-center">
+                                <svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -57,9 +114,9 @@
                     <!-- Sidebar: Chat Sessions (larger) -->
                     <div class="md:col-span-4">
                         <div class="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 sticky top-8">
-                            <div class="bg-gradient-to-r from-teal-50 to-blue-50 p-4 border-b border-gray-200 flex items-center justify-between">
-                                <h2 class="font-semibold text-gray-800">Chats</h2>
-                                <button wire:click="startNewChat" class="text-sm font-medium bg-teal-600 text-white px-3 py-1 rounded">+ New Chat</button>
+                            <div class="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-indigo-50 via-violet-50 to-cyan-50 p-4">
+                                <h2 class="font-semibold text-slate-900">Chats</h2>
+                                <button wire:click="startNewChat" type="button" class="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm">+ New Chat</button>
                             </div>
                             <div class="p-4 space-y-2 max-h-[36rem] overflow-y-auto">
                                 @forelse($sessions as $s)
@@ -68,7 +125,7 @@
                                             wire:click="selectSession({{ $s->id }})" 
                                             class="flex-1 text-left p-3 rounded-lg hover:bg-gray-100 transition font-medium text-sm
                                                 @if($session && $session->id === $s->id) 
-                                                    bg-teal-100 text-teal-900 border-l-4 border-teal-500
+                                                    border-l-4 border-indigo-500 bg-indigo-50 text-indigo-950
                                                 @else 
                                                     text-gray-700 hover:border-l-4 hover:border-gray-300
                                                 @endif
@@ -90,7 +147,7 @@
                     <div class="md:col-span-8">
                         <div class="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 flex flex-col h-96">
                             <!-- Chat Header -->
-                            <div class="bg-gradient-to-r from-teal-50 to-blue-50 p-4 border-b border-gray-200 flex items-center justify-between">
+                            <div class="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-indigo-50 via-violet-50 to-cyan-50 p-4">
                                 <div>
                                     <h2 class="font-semibold text-gray-800">
                                         @if($session)
@@ -116,12 +173,12 @@
                                     @foreach($session->messages as $m)
                                         <div class="mb-4 animate-fadeIn">
                                             <div class="flex items-baseline gap-2 mb-2">
-                                                <span class="font-semibold text-sm {{ $m->role === 'assistant' ? 'text-teal-700' : 'text-blue-700' }}">
+                                                <span class="text-sm font-semibold {{ $m->role === 'assistant' ? 'text-indigo-700' : 'text-cyan-700' }}">
                                                     {{ ucfirst($m->role) }}
                                                 </span>
                                                 <span class="text-xs text-gray-500">{{ $m->created_at->format('H:i') }}</span>
                                             </div>
-                                            <div class="p-4 rounded-lg text-sm leading-relaxed" style="background:{{ $m->role === 'assistant' ? '#EBF8F5' : '#E0F2FE' }}; color: {{ $m->role === 'assistant' ? '#0F766E' : '#0C4A6E' }}">
+                                            <div class="rounded-xl p-4 text-sm leading-relaxed" style="background:{{ $m->role === 'assistant' ? '#EEF2FF' : '#ECFEFF' }}; color: {{ $m->role === 'assistant' ? '#3730A3' : '#0E7490' }}">
                                                 {!! nl2br(e($m->content)) !!}
                                             </div>
                                         </div>
@@ -150,14 +207,14 @@
                                         wire:model.defer="newMessage" 
                                         type="text" 
                                         placeholder="Type your message..." 
-                                        class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 transition" 
+                                        class="flex-1 rounded-xl border border-slate-300 p-3 transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30" 
                                         @keydown.enter="$wire.sendMessage()"
                                     />
                                     <button 
                                         wire:click="sendMessage" 
                                         wire:loading.attr="disabled" 
                                         wire:target="sendMessage" 
-                                        class="bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white font-medium px-6 py-3 rounded-lg transition disabled:opacity-50 flex items-center gap-2"
+                                        class="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 font-medium text-white shadow-md shadow-indigo-600/25 transition hover:brightness-105 disabled:opacity-50"
                                     >
                                         <span wire:loading.remove>Send</span>
                                         <span wire:loading class="animate-spin">⏳</span>
@@ -213,8 +270,8 @@
 </style>
 
 <script>
-    document.addEventListener('livewire:load', function () {
-        Livewire.on('messageAppended', function (sessionId) {
+    document.addEventListener('livewire:init', function () {
+        Livewire.on('messageAppended', function () {
             const el = document.getElementById('chat-messages');
             if (el) {
                 setTimeout(() => {
@@ -230,7 +287,7 @@
             }
         });
 
-        Livewire.on('sessionSelected', function (id) {
+        Livewire.on('sessionSelected', function () {
             const el = document.getElementById('chat-messages');
             if (el) {
                 setTimeout(() => {
@@ -246,7 +303,7 @@
             }
         });
 
-        Livewire.on('chatStarted', function (id) {
+        Livewire.on('chatStarted', function () {
             const full = document.getElementById('chat-messages-full');
             if (full) {
                 // Trigger a re-render to show new chat in sidebar

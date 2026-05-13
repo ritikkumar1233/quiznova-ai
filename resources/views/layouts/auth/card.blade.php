@@ -3,7 +3,7 @@
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen antialiased" style="background-color:#F8F9FA; font-family:'Lexend',sans-serif;">
+    <body class="min-h-screen antialiased bg-gradient-to-br from-slate-50 via-white to-indigo-50/30" style="font-family:'Inter',ui-sans-serif,system-ui,sans-serif;">
         <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem;">
             <div style="width:100%; max-width:26rem; display:flex; flex-direction:column; gap:1.5rem;">
                 <a href="{{ route('home') }}" style="display:flex; flex-direction:column; align-items:center; gap:0.5rem; text-decoration:none;" wire:navigate>

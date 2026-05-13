@@ -16,63 +16,67 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ─────────────────────────────────────────────────────
-   QuizForge Design System — Light Mode Only
+   QuizNova AI — design system (light, premium SaaS)
    ─────────────────────────────────────────────────────
-   Off-White        #F8F9FA                  — canvas bg
-   Deep Charcoal    #1F2937  gray-800        — primary text
-   Teal Primary     #0D9488  teal-600        — primary actions
-   Coral Accent     #FF9494                  — interactive / achievement (sparing)
-   Soft Pink        #FFE3E1                  — category bento tint (2-5%)
-   Sunny Yellow     #F59E0B  amber-500       — badges/progress
-   Surface          #FFFFFF                  — card bg
-   Border           #E5E7EB  gray-200        — 1px card border
+   Canvas           soft cool gray / indigo mist
+   Primary          Indigo 600  (#4F46E5) — CTAs, links, focus
+   Accent violet    #7C3AED — gradients & highlights
+   Accent cyan      #06B6D4 — AI / insight flourishes
+   Surface          #FFFFFF — cards
+   Text             Slate / charcoal scale
+   Legacy utilities named *-teal-* map to indigo for compatibility
    ───────────────────────────────────────────────────── */
 
 
 @theme {
-    /* ── Typography — Lexend for reading ease ── */
-    --font-sans: 'Lexend', ui-sans-serif, system-ui, sans-serif,
+    /* ── Typography — Inter (variable) ── */
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
     /* ── Canvas & surface ── */
-    --color-canvas:       #F8F9FA;
+    --color-canvas:       #f3f4f9;
     --color-surface:      #FFFFFF;
-    --color-border:       #E5E7EB;
-    --color-border-hover: #D1D5DB;
+    --color-border:       #e2e8f0;
+    --color-border-hover: #cbd5e1;
 
     /* ── Charcoal text scale ── */
-    --color-charcoal-900: #1F2937;
-    --color-charcoal-600: #4B5563;
-    --color-charcoal-400: #9CA3AF;
+    --color-charcoal-900: #0f172a;
+    --color-charcoal-600: #475569;
+    --color-charcoal-400: #94a3b8;
 
-    /* ── Teal (primary actions) ── */
-    --color-teal-50:  #F0FDFA;
-    --color-teal-100: #CCFBF1;
-    --color-teal-200: #99F6E4;
-    --color-teal-500: #14B8A6;
-    --color-teal-600: #0D9488;
-    --color-teal-700: #0F766E;
-    --color-teal-800: #115E59;
+    /* ── Primary ramp (exposed as teal-* for existing class names) ── */
+    --color-teal-50:  #eef2ff;
+    --color-teal-100: #e0e7ff;
+    --color-teal-200: #c7d2fe;
+    --color-teal-500: #6366f1;
+    --color-teal-600: #4f46e5;
+    --color-teal-700: #4338ca;
+    --color-teal-800: #3730a3;
 
-    /* ── Coral Accent (interactive / achievement — use sparingly) ── */
-    --color-coral:       #FF9494;
-    --color-coral-50:    #FFF0EF;
-    --color-coral-100:   #FFE3E1;
-    --color-coral-600:   #FF6B6B;
-    --color-coral-700:   #E05555;
+    /* ── Nova accent tokens ── */
+    --color-nova-violet:     #7c3aed;
+    --color-nova-cyan:     #06b6d4;
+    --color-nova-midnight: #1e1b4b;
 
-    /* ── Sunny Yellow ── */
-    --color-sunny-50:  #FFFBEB;
-    --color-sunny-100: #FEF3C7;
-    --color-sunny-300: #FCD34D;
-    --color-sunny-400: #FBBF24;
-    --color-sunny-500: #F59E0B;
-    --color-sunny-600: #D97706;
-    --color-sunny-900: #78350F;
+    /* ── Warm accent (badges / alerts) ── */
+    --color-coral:       #f472b6;
+    --color-coral-50:    #fdf2f8;
+    --color-coral-100:   #fce7f3;
+    --color-coral-600:   #db2777;
+    --color-coral-700:   #be185d;
 
-    /* ── Flux accent → Teal ── */
-    --color-accent:            #0D9488;
-    --color-accent-content:    #0D9488;
+    /* ── Sunny (warnings / scores) ── */
+    --color-sunny-50:  #fffbeb;
+    --color-sunny-100: #fef3c7;
+    --color-sunny-300: #fcd34d;
+    --color-sunny-400: #fbbf24;
+    --color-sunny-500: #f59e0b;
+    --color-sunny-600: #d97706;
+    --color-sunny-900: #78350f;
+
+    /* ── Flux accent → Indigo ── */
+    --color-accent:            #4f46e5;
+    --color-accent-content:    #4f46e5;
     --color-accent-foreground: #FFFFFF;
 
     /* ── Zinc (kept for Flux internals) ── */
@@ -92,9 +96,9 @@
     --radius-bento:       14px;
     --radius-bento-inner: 10px;
 
-    /* ── Shadows ── */
-    --shadow-bento:       0 1px 3px 0 rgba(31,41,55,.06), 0 1px 2px -1px rgba(31,41,55,.04);
-    --shadow-bento-hover: 0 8px 28px -4px rgba(31,41,55,.10), 0 2px 6px -2px rgba(31,41,55,.06);
+    /* ── Shadows (soft, indigo-tinted) ── */
+    --shadow-bento:       0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+    --shadow-bento-hover: 0 18px 40px -12px rgba(79, 70, 229, 0.18), 0 8px 16px -8px rgba(15, 23, 42, 0.08);
 }
 
 /* ═══════════════════════════════════════════
@@ -106,21 +110,21 @@
     }
 
     html {
-        background-color: #F8F9FA;
-        color: #1F2937;
+        background-color: var(--color-canvas);
+        color: var(--color-charcoal-900);
     }
 
     body {
-        background-color: #F8F9FA;
-        color: #1F2937;
+        background-color: var(--color-canvas);
+        color: var(--color-charcoal-900);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
     }
 
     h1, h2, h3, h4, h5, h6 {
-        letter-spacing: -0.025em;
+        letter-spacing: -0.03em;
         font-weight: 700;
-        color: #1F2937;
+        color: var(--color-charcoal-900);
     }
 
     *,
@@ -165,14 +169,14 @@
         box-shadow: var(--shadow-bento);
     }
 
-    /* ── Teal highlight card ── */
+    /* ── Hero / CTA card (indigo → violet) ── */
     .bento-teal {
-        background-color: var(--color-teal-600);
+        background: linear-gradient(135deg, #312e81 0%, var(--color-teal-600) 45%, var(--color-nova-violet) 100%);
         border: none;
         border-radius: var(--radius-bento);
         padding: 2rem;
         color: white;
-        box-shadow: 0 8px 32px -4px rgba(13,148,136,.35);
+        box-shadow: 0 20px 50px -12px rgba(79, 70, 229, 0.45);
     }
 
     /* ── Canvas cell (subtle off-white) ── */
@@ -190,10 +194,11 @@
         justify-content: center;
         width: 2.75rem;
         height: 2.75rem;
-        background-color: var(--color-teal-50);
+        background: linear-gradient(145deg, var(--color-teal-100), rgba(6, 182, 212, 0.12));
         color: var(--color-teal-700);
         border-radius: var(--radius-bento-inner);
         flex-shrink: 0;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
     }
 
     .icon-sunny {
@@ -247,25 +252,26 @@
     .progress-fill {
         height: 100%;
         border-radius: 999px;
-        background: linear-gradient(90deg, var(--color-sunny-400), var(--color-sunny-500));
+        background: linear-gradient(90deg, var(--color-teal-500), var(--color-nova-violet));
         transition: width 700ms cubic-bezier(.4,0,.2,1);
     }
 
     /* ── Frosted glass nav bar ── */
     .glass-bar {
-        background-color: rgba(248, 249, 250, 0.85);
-        backdrop-filter: blur(14px) saturate(1.2);
-        -webkit-backdrop-filter: blur(14px) saturate(1.2);
-        border-bottom: 1px solid rgba(229, 231, 235, 0.85);
+        background-color: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(16px) saturate(1.35);
+        -webkit-backdrop-filter: blur(16px) saturate(1.35);
+        border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
     }
 
-    /* ── Teal primary button (inline helper) ── */
+    /* ── Primary CTA (QuizNova) ── */
     .btn-teal {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: .5rem;
-        background-color: var(--color-teal-600);
+        background: linear-gradient(135deg, var(--color-teal-600) 0%, var(--color-nova-violet) 100%);
         color: white;
         font-weight: 600;
         font-size: .875rem;
@@ -273,13 +279,15 @@
         border-radius: var(--radius-bento-inner);
         border: none;
         cursor: pointer;
-        transition: background-color 150ms ease, box-shadow 150ms ease;
+        transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
         text-decoration: none;
+        box-shadow: 0 4px 14px -2px rgba(79, 70, 229, 0.45);
     }
 
     .btn-teal:hover {
-        background-color: var(--color-teal-700);
-        box-shadow: 0 4px 14px -2px rgba(13,148,136,.4);
+        filter: brightness(1.05);
+        transform: translateY(-1px);
+        box-shadow: 0 8px 24px -4px rgba(79, 70, 229, 0.5);
     }
 
     /* ── Score colours ── */
@@ -304,8 +312,8 @@
         box-shadow: var(--shadow-bento);
         background-image: linear-gradient(
             135deg,
-            rgba(255, 227, 225, 0.18) 0%,
-            rgba(255, 148, 148, 0.04) 100%
+            rgba(99, 102, 241, 0.06) 0%,
+            rgba(6, 182, 212, 0.05) 100%
         );
         transition:
             box-shadow 220ms cubic-bezier(.4,0,.2,1),
@@ -315,7 +323,7 @@
 
     .bento-category:hover {
         box-shadow: var(--shadow-bento-hover);
-        border-color: rgba(255, 148, 148, 0.35);
+        border-color: rgba(99, 102, 241, 0.35);
         transform: translateY(-2px);
     }
 
@@ -372,19 +380,19 @@
 /* ── Flux typography — enforce design system text colors ── */
 /* flux.css uses [:where(&)] (zero specificity); an attribute selector wins  */
 [data-flux-heading] {
-    color: #1F2937 !important;
+    color: #0f172a !important;
 }
 
 [data-flux-subheading] {
-    color: #4B5563 !important;
+    color: #475569 !important;
 }
 
 [data-flux-text] {
-    color: #4B5563 !important;
+    color: #475569 !important;
 }
 
 [data-flux-label] {
-    color: #1F2937 !important;
+    color: #0f172a !important;
 }
 
 [data-flux-description] {
@@ -393,22 +401,22 @@
 
 /* ── Flux table — force readable text ── */
 [data-flux-column] {
-    color: #1F2937 !important;
+    color: #0f172a !important;
 }
 
 [data-flux-cell] {
-    color: #4B5563 !important;
+    color: #475569 !important;
 }
 
 /* ── Flux select button text ── */
 button[data-flux-select],
 button[data-flux-select] * {
-    color: #1F2937 !important;
+    color: #0f172a !important;
 }
 
 /* ── Flux menu / dropdown items ── */
 [data-flux-menu-item] {
-    color: #1F2937 !important;
+    color: #0f172a !important;
 }
 
 /* ── Flux sidebar items ── */
@@ -417,14 +425,14 @@ button[data-flux-select] * {
 }
 
 [data-flux-sidebar-item][data-current] {
-    color: #0D9488 !important;
+    color: #4f46e5 !important;
 }
 
-/* ── Teal accent — override Flux's default zinc-800 ── */
+/* ── Flux accent — QuizNova indigo ── */
 @layer theme {
     :root {
-        --color-accent:            #0D9488;
-        --color-accent-content:    #0D9488;
+        --color-accent:            #4f46e5;
+        --color-accent-content:    #4f46e5;
         --color-accent-foreground: #FFFFFF;
     }
 }
@@ -443,7 +451,7 @@ input[data-flux-control] {
     border-color: var(--color-border) !important;
     border-bottom-color: var(--color-border-hover) !important;
     background-color: var(--color-surface) !important;
-    color: #1F2937 !important;
+    color: #0f172a !important;
     padding-top: 0.625rem !important;
     padding-bottom: 0.625rem !important;
     height: auto !important;
@@ -456,7 +464,7 @@ input[data-flux-control]:focus-visible {
     outline: none !important;
     border-color: var(--color-teal-600) !important;
     border-bottom-color: var(--color-teal-600) !important;
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14) !important;
 }
 
 /* ── Textarea ── */
@@ -466,7 +474,7 @@ textarea[data-flux-control] {
     border-color: var(--color-border) !important;
     border-bottom-color: var(--color-border-hover) !important;
     background-color: var(--color-surface) !important;
-    color: #1F2937 !important;
+    color: #0f172a !important;
     padding: 0.75rem 0.875rem !important;
     transition: border-color 150ms ease, box-shadow 150ms ease;
 }
@@ -476,7 +484,7 @@ textarea[data-flux-control]:focus-visible {
     outline: none !important;
     border-color: var(--color-teal-600) !important;
     border-bottom-color: var(--color-teal-600) !important;
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14) !important;
 }
 
 /* ── Native select ── */
@@ -486,7 +494,7 @@ select[data-flux-select-native] {
     border-color: var(--color-border) !important;
     border-bottom-color: var(--color-border-hover) !important;
     background-color: var(--color-surface) !important;
-    color: #1F2937 !important;
+    color: #0f172a !important;
     height: auto !important;
     min-height: 2.75rem;
     padding-top: 0.625rem !important;
@@ -499,7 +507,7 @@ select[data-flux-select-native]:focus-visible {
     outline: none !important;
     border-color: var(--color-teal-600) !important;
     border-bottom-color: var(--color-teal-600) !important;
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14) !important;
 }
 
 /* ── Checkbox & Radio focus-visible ring ── */
@@ -530,7 +538,7 @@ ui-radio[data-flux-radio-cards]:not([data-checked]):hover {
 
 ui-radio[data-flux-radio-cards][data-checked] {
     border-color: var(--color-teal-600) !important;
-    box-shadow: 0 0 0 1px var(--color-teal-600), 0 4px 14px -2px rgba(13, 148, 136, 0.15) !important;
+    box-shadow: 0 0 0 1px var(--color-teal-600), 0 4px 14px -2px rgba(79, 70, 229, 0.18) !important;
 }
 
 /* ── Quiz option card (raw HTML radio labels in take-exam) ── */
@@ -556,7 +564,7 @@ ui-radio[data-flux-radio-cards][data-checked] {
 .quiz-option--selected {
     border-color: var(--color-teal-600);
     background-color: var(--color-teal-50);
-    box-shadow: 0 0 0 1px var(--color-teal-600), 0 4px 14px -2px rgba(13, 148, 136, 0.12);
+    box-shadow: 0 0 0 1px var(--color-teal-600), 0 4px 14px -2px rgba(79, 70, 229, 0.14);
 }
 
 .quiz-option input[type="radio"] {
@@ -579,4 +587,22 @@ input[data-flux-control]::placeholder,
 textarea[data-flux-control]::placeholder {
     color: #9CA3AF !important;
     opacity: 1 !important;
+}
+
+@layer components {
+    /* ── QuizNova marketing / hero helpers ── */
+    .nova-gradient-text {
+        background: linear-gradient(105deg, #4f46e5 0%, #7c3aed 42%, #06b6d4 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+
+    .nova-glow-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.45;
+        pointer-events: none;
+    }
 }

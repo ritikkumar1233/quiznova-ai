@@ -49,6 +49,20 @@ it('student can visit a published exam', function () {
         ->assertOk();
 });
 
+it('take exam uses isolated exam layout without global chat chrome', function () {
+    $student = User::factory()->student()->create();
+    $teacher = User::factory()->teacher()->create();
+    $exam = Exam::factory()->published()->for($teacher)->has(Question::factory(), 'questions')->create();
+
+    $html = $this->actingAs($student)
+        ->get(route('student.exams.take', $exam))
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('exam-layout')
+        ->and($html)->not->toContain('AI Chat Assistant');
+});
+
 it('creates attempt when student visits exam', function () {
     $student = User::factory()->student()->create();
     $teacher = User::factory()->teacher()->create();
