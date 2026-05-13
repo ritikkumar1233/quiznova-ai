@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-{{-- Distraction-free exam shell (no sidebar / chat). Toasts still work for disqualification notices. --}}
-=======
 {{--
     Exam mode layout — full-page assessment shell only.
 
@@ -10,22 +7,16 @@
     Anti-cheat UI (fullscreen prompts, tab-switch warnings, violation modal) is rendered
     by the take-exam Livewire page inside {{ $slot }}.
 --}}
->>>>>>> change
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
     </head>
-<<<<<<< HEAD
-    <body class="min-h-screen antialiased bg-gradient-to-b from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900" style="font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;">
-        <div class="exam-layout mx-auto min-h-screen w-full max-w-[100vw] px-3 py-4 sm:px-8 sm:py-6 md:px-12 md:py-8">
-=======
     <body
-        class="exam-layout min-h-screen antialiased"
-        style="background-color:#F8F9FA; color:#1F2937; font-family:'Lexend',sans-serif;"
+        class="exam-layout min-h-screen antialiased bg-gradient-to-b from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900"
+        style="font-family:'Inter', ui-sans-serif, system-ui, sans-serif;"
     >
-        <div class="exam-layout__frame mx-auto w-full min-h-screen max-w-[100vw] px-3 py-4 sm:px-6 sm:py-6 md:px-10 md:py-8 lg:px-12">
->>>>>>> change
+        <div class="exam-layout__frame mx-auto min-h-screen w-full max-w-[100vw] px-3 py-4 sm:px-8 sm:py-6 md:px-12 md:py-8">
             {{ $slot }}
         </div>
 
